@@ -806,8 +806,8 @@ class Fighter {
             let vx = Math.cos(finalAngle) * power;
             let vy = Math.sin(finalAngle) * power;
 
-            let startX = this.x + (this.isPlayer ? 80 : 20);
-            let startY = this.y + 80;
+            let startX = this.x + (this.isPlayer ? this.width * 0.8 : this.width * 0.2);
+            let startY = this.y + this.height * 0.4;
 
             projectiles.push(new Projectile(startX, startY, vx, vy, 'bullet', this.isPlayer));
             playSoundEffect('gun');
@@ -848,7 +848,7 @@ class Projectile {
 
         // Bullet pays no respect to gravity
         if (this.type !== 'bullet') {
-            this.vy += gravity;
+            this.vy += gravity * GAME_SCALE;
         }
 
         if (this.y > canvas.height - 100 || this.x < -100 || this.x > canvas.width + 100) {
@@ -1392,7 +1392,7 @@ function drawTrajectory() {
             simY += tempVy;
 
             if (!isGunMode) {
-                tempVy += gravity;
+                tempVy += gravity * GAME_SCALE;
             }
 
             ctx.lineTo(simX, simY);
