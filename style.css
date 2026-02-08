@@ -69,21 +69,30 @@ body {
 }
 
 .glass-panel {
-    background: rgba(0, 0, 0, 0.8);
-    backdrop-filter: blur(10px);
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(12px);
     border: 1px solid var(--glass-border);
     border-radius: 20px;
     padding: 2rem;
     text-align: center;
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);
-    max-width: 600px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.9);
+    max-width: 650px;
     width: 90%;
-    /* Responsive Scroll for Landscape Mobile */
     max-height: 90vh;
     overflow-y: auto;
     animation: zoomIn 0.5s ease;
     z-index: 10;
     position: relative;
+
+    /* Hide scrollbar for Chrome, Safari and Opera */
+    &::-webkit-scrollbar {
+        display: none;
+    }
+
+    -ms-overflow-style: none;
+    /* IE and Edge */
+    scrollbar-width: none;
+    /* Firefox */
 }
 
 @keyframes zoomIn {
@@ -99,7 +108,7 @@ body {
 }
 
 .title-bn {
-    font-size: 3rem;
+    font-size: clamp(1.8rem, 8vh, 3.5rem);
     font-weight: 900;
     color: var(--gold);
     text-shadow: 0 0 10px rgba(255, 204, 0, 0.5);
@@ -107,9 +116,9 @@ body {
 }
 
 .subtitle-bn {
-    font-size: 1.2rem;
+    font-size: clamp(0.9rem, 1.5vh, 1.2rem);
     color: #ccc;
-    margin-bottom: 2rem;
+    margin-bottom: 2vh;
 }
 
 /* Mobile Rotation Warning */
@@ -266,71 +275,61 @@ body {
     display: block;
 }
 
-/* HUD Layer */
 .hud-layer {
     position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    padding: 2vmin;
+    top: 20px;
+    left: 20px;
+    right: 20px;
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    pointer-events: none;
-    z-index: 5;
+    z-index: 100;
 }
 
 .fighter-hud {
-    display: flex;
-    flex-direction: column;
     width: 40%;
 }
 
-.fighter-hud.right {
-    align-items: flex-end;
-}
-
 .fighter-name {
-    font-size: 4vmin;
+    font-size: 1.5rem;
     font-weight: 900;
     text-transform: uppercase;
-    color: #fff;
     text-shadow: 2px 2px 0 #000;
-    margin-bottom: 0.5vmin;
+    margin-bottom: 5px;
 }
 
 .health-bar-container {
     width: 100%;
-    height: 3vmin;
-    background: #333;
+    height: 20px;
+    background: #444;
     border: 2px solid #fff;
     border-radius: 10px;
     overflow: hidden;
-    position: relative;
 }
 
 .health-bar {
     height: 100%;
-    background: linear-gradient(90deg, #76ff03, #64dd17);
-    transition: width 0.2s ease-out;
+    background: linear-gradient(90deg, #00ff00, #ffff00);
+    transition: width 0.3s ease-out;
+}
+
+.izzat-text {
+    font-size: 0.8rem;
+    text-align: right;
+    margin-top: 2px;
+    font-style: italic;
+    color: #aaa;
 }
 
 .vs-badge {
     position: absolute;
     left: 50%;
-    top: 2vmin;
     transform: translateX(-50%);
-    font-size: 6vmin;
+    font-size: 3rem;
     font-weight: 900;
     color: var(--secondary);
-    text-shadow: 0 0 20px rgba(255, 0, 0, 0.8);
-    animation: pulse 1s infinite alternate;
-}
-
-.izzat-text {
-    font-size: 2vmin;
-    color: rgba(255, 255, 255, 0.5);
-    margin-top: 5px;
+    text-shadow: 0 0 10px red;
+    top: 10px;
 }
 
 /* Ammo Selector */
@@ -463,50 +462,57 @@ body {
     }
 }
 
-/* Responsive Touch Controls */
+/* Touch Controls (Enhanced) */
 .touch-controls {
-    display: none;
-    /* Block on mobile via media query */
     position: absolute;
-    bottom: 2vmin;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    pointer-events: none;
-    z-index: 20;
+    bottom: max(30px, env(safe-area-inset-bottom));
+    left: max(20px, env(safe-area-inset-left));
+    right: max(20px, env(safe-area-inset-right));
+    display: flex;
     justify-content: space-between;
-    padding: 0 4vmin;
-    align-items: flex-end;
+    pointer-events: none;
+    z-index: 2000;
 }
 
 .touch-group {
     display: flex;
-    gap: 2vmin;
+    gap: 20px;
     pointer-events: auto;
+    align-items: flex-end;
 }
 
 .touch-btn {
-    width: 12vmin;
-    height: 12vmin;
+    width: 75px;
+    height: 75px;
     background: rgba(255, 255, 255, 0.1);
-    border: 2px solid rgba(255, 255, 255, 0.3);
+    border: 2px solid rgba(255, 255, 255, 0.4);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
     border-radius: 50%;
     display: flex;
-    justify-content: center;
     align-items: center;
-    font-size: 6vmin;
+    justify-content: center;
+    font-size: 2rem;
     color: white;
-    backdrop-filter: blur(5px);
-    user-select: none;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
     touch-action: manipulation;
+    user-select: none;
+    transition: all 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    cursor: pointer;
 }
 
-.touch-btn:active {
-    background: rgba(255, 255, 255, 0.3);
-    transform: scale(0.95);
+.touch-btn:active,
+.touch-btn.active {
+    background: rgba(255, 204, 0, 0.6);
+    transform: scale(0.9);
+    border-color: var(--gold);
+    box-shadow: 0 0 15px rgba(255, 204, 0, 0.6);
 }
 
 .touch-btn.large {
+    width: 90px;
+    height: 90px;
+    font-size: 2.5rem;
     background: rgba(244, 42, 65, 0.2);
     border-color: rgba(244, 42, 65, 0.5);
 }

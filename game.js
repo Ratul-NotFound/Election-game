@@ -121,20 +121,18 @@ class Particle {
     constructor(x, y, type) {
         this.x = x;
         this.y = y;
-        this.vx = (Math.random() - 0.5) * (10 * scale);
-        this.vy = (Math.random() - 0.5) * (10 * scale);
-        this.life = 1.0;
-        this.decay = Math.random() * 0.05 + 0.02;
-        this.type = type; // 'dust', 'blood', 'egg', 'star'
-        this.size = (Math.random() * 5 + 2) * scale;
-        this.color = this.getColor(type);
+        this.type = type; // 'sweat', 'star'
+        this.vx = (Math.random() - 0.5) * 10;
+        this.vy = (Math.random() - 0.5) * 10;
+        this.life = 60;
+        this.size = Math.random() * 5 + 2;
     }
 
     update() {
         this.x += this.vx;
         this.y += this.vy;
         this.vy += 0.2; // Gravity
-        this.life -= this.decay;
+        this.life--;
         return this.life > 0;
     }
 
@@ -160,7 +158,7 @@ class Particle {
         } else if (this.type === 'dust') {
             ctx.fillStyle = 'rgba(150, 150, 150, 0.5)';
             ctx.beginPath();
-            ctx.arc(this.x, this.y, this.size * (2 - this.life / 60), 0, Math.PI * 2); // Expand
+            ctx.arc(this.x, this.y, this.size * GAME_SCALE * (2 - this.life / 60), 0, Math.PI * 2); // Expand
             ctx.fill();
         }
         ctx.restore();
@@ -253,15 +251,20 @@ ammoOptions.forEach(opt => {
     });
 });
 
-let scale = 1;
-const BASE_HEIGHT = 600; // Design baseline
+let GAME_SCALE = 1;
+let GROUND_Y = 0;
 
 function resize() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
-    scale = Math.min(canvas.width / 1000, canvas.height / BASE_HEIGHT);
-    // Prevent scale from becoming too small or too large
-    scale = Math.max(0.6, Math.min(1.5, scale));
+
+    // Calculate scale based on a reference resolution (e.g., 1280x720)
+    // We use min to ensure the whole game fits on screen
+    GAME_SCALE = Math.min(canvas.width / 1200, canvas.height / 700);
+    if (GAME_SCALE > 1.2) GAME_SCALE = 1.2; // Cap scale for huge screens
+    if (GAME_SCALE < 0.5) GAME_SCALE = 0.5; // Floor scale for tiny screens
+
+    GROUND_Y = canvas.height * 0.85;
 }
 window.addEventListener('resize', resize);
 resize();
@@ -269,13 +272,14 @@ resize();
 class Fighter {
     constructor(isPlayer, type) {
         this.isPlayer = isPlayer;
-        this.type = type; // 'abbas' or 'nasir'
-        this.width = 100 * scale;
-        this.height = 200 * scale;
-        this.x = isPlayer ? 100 * scale : canvas.width - (200 * scale);
-        // Ground is relative to height, e.g. 80% down
-        this.startY = canvas.height * 0.75;
-        this.y = this.startY;
+        this.type = type;
+        this.baseWidth = 100;
+        this.baseHeight = 200;
+        this.width = this.baseWidth * GAME_SCALE;
+        this.height = this.baseHeight * GAME_SCALE;
+
+        this.x = isPlayer ? canvas.width * 0.15 : canvas.width * 0.85 - this.width;
+        this.y = GROUND_Y - this.height;
 
         this.maxHealth = 1000;
         this.health = 1000;
@@ -283,12 +287,12 @@ class Fighter {
         this.vy = 0;
         this.onGround = true;
         this.cooldown = 0;
-        this.throwingTimer = 0; // For animation
-        this.hitStun = 0; // Stun timer
-        this.hitMarks = []; // Array of {type, relX, relY, life}
-        this.vx = 0; // Knockback velocity
-        this.rotation = 0; // Torso lean
-        this.muzzleFlash = 0; // Timer for muzzle flash
+        this.throwingTimer = 0;
+        this.hitStun = 0;
+        this.hitMarks = [];
+        this.vx = 0;
+        this.rotation = 0;
+        this.muzzleFlash = 0;
     }
 
     update() {
@@ -323,10 +327,9 @@ class Fighter {
 
         // Gravity
         this.y += this.vy;
-        const groundLimit = canvas.height * 0.75; // Matches startY
-
+        const groundLimit = GROUND_Y - this.height;
         if (this.y < groundLimit) {
-            this.vy += gravity * scale;
+            this.vy += gravity * GAME_SCALE;
             this.onGround = false;
         } else {
             this.y = groundLimit;
@@ -335,18 +338,18 @@ class Fighter {
 
             // Slide dust
             if (Math.abs(this.vx) > 2) {
-                spawnParticles(this.x + (50 * scale), this.y + (190 * scale), 'dust', 1);
+                spawnParticles(this.x + this.width / 2, this.y + this.height * 0.95, 'dust', 1);
             }
         }
 
         // Player Movement Logic
         if (this.isPlayer && gameActive) {
-            let speed = 5;
+            let speed = 5 * GAME_SCALE;
             if (keys['Shift']) {
-                speed = 12; // SPRINT!
+                speed = 12 * GAME_SCALE; // SPRINT!
                 // Sprint Dust
                 if (this.onGround && Math.abs(this.vx) > 0 && Math.random() < 0.3) {
-                    spawnParticles(this.x + 50, this.y + 190, 'dust', 1);
+                    spawnParticles(this.x + this.width / 2, this.y + this.height * 0.95, 'dust', 1);
                 }
             }
 
@@ -403,13 +406,22 @@ class Fighter {
     }
 
     draw() {
-        // 1. Draw Shadow
-        const groundY = canvas.height * 0.75 + (200 * scale); // Feet level
-        let shadowWidth = (60 * scale) * (1 - (groundY - (this.y + (190 * scale))) / (400 * scale));
+        // 1. Draw Shadow (Absolute coordinates, beneath character)
+        const groundY = GROUND_Y;
+        let shadowWidth = (this.width * 0.6) * (1 - (groundY - (this.y + this.height)) / (400 * GAME_SCALE));
+        let shadowAlpha = 0.3 * (1 - (groundY - (this.y + this.height)) / (400 * GAME_SCALE));
 
         ctx.save();
-        ctx.translate(this.x + (50 * scale), this.y + (150 * scale)); // Pivot
-        ctx.scale(scale, scale); // APPLY GLOBAL SCALE TO LOCAL CONTEXT
+        ctx.fillStyle = `rgba(0, 0, 0, ${shadowAlpha})`;
+        ctx.beginPath();
+        ctx.ellipse(this.x + this.width / 2, groundY, Math.max(0, shadowWidth), 10 * GAME_SCALE, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+
+        // 2. Main Character Context (Local Space)
+        ctx.save();
+        ctx.translate(this.x + this.width / 2, this.y + this.height * 0.75); // Pivot at Hips
+        ctx.scale(GAME_SCALE, GAME_SCALE);
 
         // Body tilt (Knockback/Throw)
         let tilt = this.rotation;
@@ -600,34 +612,37 @@ class Fighter {
             let alpha = mark.life / 60;
             ctx.globalAlpha = alpha;
 
+            const mx = this.x + mark.relX * GAME_SCALE;
+            const my = this.y + mark.relY * GAME_SCALE;
+
             if (mark.type === 'egg') {
                 // --- HYPER REALISTIC EGG SPLAT ---
                 ctx.fillStyle = "#fdfdfd";
                 ctx.beginPath();
                 for (let i = 0; i < 8; i++) {
                     let angle = (i / 8) * Math.PI * 2;
-                    let rad = 15 + Math.sin(mark.seed * i + mark.life) * 5;
-                    let px = this.x + mark.relX + Math.cos(angle) * rad;
-                    let py = this.y + mark.relY + Math.sin(angle) * rad * 0.8;
+                    let rad = (15 + Math.sin(mark.seed * i + mark.life) * 5) * GAME_SCALE;
+                    let px = mx + Math.cos(angle) * rad;
+                    let py = my + Math.sin(angle) * rad * 0.8;
                     if (i === 0) ctx.moveTo(px, py);
-                    else ctx.quadraticCurveTo(this.x + mark.relX, this.y + mark.relY, px, py);
+                    else ctx.quadraticCurveTo(mx, my, px, py);
                 }
                 ctx.fill();
 
                 ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
-                ctx.beginPath(); ctx.arc(this.x + mark.relX - 2, this.y + mark.relY - 5, 10, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.arc(mx - 2 * GAME_SCALE, my - 5 * GAME_SCALE, 10 * GAME_SCALE, 0, Math.PI * 2); ctx.fill();
 
                 ctx.fillStyle = "#ffb300";
-                ctx.beginPath(); ctx.arc(this.x + mark.relX, this.y + mark.relY, 8, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.arc(mx, my, 8 * GAME_SCALE, 0, Math.PI * 2); ctx.fill();
 
-                let dripLen = (60 - mark.life) * 0.8;
+                let dripLen = (60 - mark.life) * 0.8 * GAME_SCALE;
                 ctx.fillStyle = "rgba(255, 200, 0, 0.8)";
                 for (let k = 0; k < 2; k++) {
-                    let dx = Math.cos(mark.seed * k) * 8;
+                    let dx = Math.cos(mark.seed * k) * 8 * GAME_SCALE;
                     ctx.beginPath();
-                    ctx.moveTo(this.x + mark.relX + dx, this.y + mark.relY + 5);
-                    ctx.lineTo(this.x + mark.relX + dx - 2, this.y + mark.relY + dripLen + 10);
-                    ctx.lineTo(this.x + mark.relX + dx + 2, this.y + mark.relY + dripLen + 10);
+                    ctx.moveTo(mx + dx, my + 5 * GAME_SCALE);
+                    ctx.lineTo(mx + dx - 2 * GAME_SCALE, my + dripLen + 10 * GAME_SCALE);
+                    ctx.lineTo(mx + dx + 2 * GAME_SCALE, my + dripLen + 10 * GAME_SCALE);
                     ctx.fill();
                 }
             } else if (mark.type === 'banana') {
@@ -636,16 +651,16 @@ class Fighter {
                 for (let i = 0; i < 4; i++) {
                     let angle = (i / 4) * Math.PI * 2 + mark.seed;
                     ctx.save();
-                    ctx.translate(this.x + mark.relX, this.y + mark.relY);
+                    ctx.translate(mx, my);
                     ctx.rotate(angle);
-                    ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(15, -15, 25, 0); ctx.quadraticCurveTo(15, 15, 0, 0); ctx.fill();
-                    ctx.fillStyle = "#5d4037"; ctx.beginPath(); ctx.arc(15, 2, 1.5, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(15 * GAME_SCALE, -15 * GAME_SCALE, 25 * GAME_SCALE, 0); ctx.quadraticCurveTo(15 * GAME_SCALE, 15 * GAME_SCALE, 0, 0); ctx.fill();
+                    ctx.fillStyle = "#5d4037"; ctx.beginPath(); ctx.arc(15 * GAME_SCALE, 2 * GAME_SCALE, 1.5 * GAME_SCALE, 0, Math.PI * 2); ctx.fill();
                     ctx.restore();
                 }
-                ctx.fillStyle = "#fffde7"; ctx.beginPath(); ctx.arc(this.x + mark.relX, this.y + mark.relY, 6, 0, Math.PI * 2); ctx.fill();
+                ctx.fillStyle = "#fffde7"; ctx.beginPath(); ctx.arc(mx, my, 6 * GAME_SCALE, 0, Math.PI * 2); ctx.fill();
                 ctx.fillStyle = "rgba(255, 245, 157, 0.6)";
                 for (let j = 0; j < 5; j++) {
-                    ctx.beginPath(); ctx.arc(this.x + mark.relX + Math.cos(mark.seed * j) * 8, this.y + mark.relY + Math.sin(mark.seed * j) * 8, 4, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(mx + Math.cos(mark.seed * j) * 8 * GAME_SCALE, my + Math.sin(mark.seed * j) * 8 * GAME_SCALE, 4 * GAME_SCALE, 0, Math.PI * 2); ctx.fill();
                 }
             } else if (mark.type === 'tomato') {
                 // --- TOMATO LYCOPENIC EXPLOSION ---
@@ -653,38 +668,38 @@ class Fighter {
                 ctx.beginPath();
                 for (let i = 0; i < 10; i++) {
                     let angle = (i / 10) * Math.PI * 2;
-                    let rad = 18 + Math.sin(mark.seed * i) * 7;
-                    let px = this.x + mark.relX + Math.cos(angle) * rad;
-                    let py = this.y + mark.relY + Math.sin(angle) * rad;
+                    let rad = (18 + Math.sin(mark.seed * i) * 7) * GAME_SCALE;
+                    let px = mx + Math.cos(angle) * rad;
+                    let py = my + Math.sin(angle) * rad;
                     if (i === 0) ctx.moveTo(px, py);
-                    else ctx.quadraticCurveTo(this.x + mark.relX, this.y + mark.relY, px, py);
+                    else ctx.quadraticCurveTo(mx, my, px, py);
                 }
                 ctx.fill();
 
                 ctx.fillStyle = "#ffeb3b";
                 for (let s = 0; s < 6; s++) {
-                    let sx = this.x + mark.relX + (Math.cos(mark.seed + s) * 10);
-                    let sy = this.y + mark.relY + (Math.sin(mark.seed + s) * 10);
-                    ctx.beginPath(); ctx.ellipse(sx, sy, 3, 2, mark.seed + s, 0, Math.PI * 2); ctx.fill();
+                    let sx = mx + (Math.cos(mark.seed + s) * 10 * GAME_SCALE);
+                    let sy = my + (Math.sin(mark.seed + s) * 10 * GAME_SCALE);
+                    ctx.beginPath(); ctx.ellipse(sx, sy, 3 * GAME_SCALE, 2 * GAME_SCALE, mark.seed + s, 0, Math.PI * 2); ctx.fill();
                 }
 
                 ctx.fillStyle = "rgba(183, 28, 28, 0.5)";
                 for (let g = 0; g < 4; g++) {
-                    let gx = this.x + mark.relX + (Math.cos(mark.seed * g) * 20);
-                    let gy = this.y + mark.relY + (Math.sin(mark.seed * g) * 20);
-                    ctx.beginPath(); ctx.arc(gx, gy, 6, 0, Math.PI * 2); ctx.fill();
+                    let gx = mx + (Math.cos(mark.seed * g) * 20 * GAME_SCALE);
+                    let gy = my + (Math.sin(mark.seed * g) * 20 * GAME_SCALE);
+                    ctx.beginPath(); ctx.arc(gx, gy, 6 * GAME_SCALE, 0, Math.PI * 2); ctx.fill();
                 }
             } else {
                 // --- PROCEDURAL BRUISE ---
-                let bruiseGrad = ctx.createRadialGradient(this.x + mark.relX, this.y + mark.relY, 0, this.x + mark.relX, this.y + mark.relY, 28);
+                let bruiseGrad = ctx.createRadialGradient(mx, my, 0, mx, my, 28 * GAME_SCALE);
                 bruiseGrad.addColorStop(0, "rgba(50, 0, 80, 0.4)");
                 bruiseGrad.addColorStop(1, "rgba(200, 50, 50, 0)");
                 ctx.fillStyle = bruiseGrad;
                 ctx.beginPath();
                 for (let b = 0; b < 6; b++) {
                     let ang = (b / 6) * Math.PI * 2;
-                    let rad = 15 + Math.sin(mark.seed * b) * 5;
-                    ctx.lineTo(this.x + mark.relX + Math.cos(ang) * rad, this.y + mark.relY + Math.sin(ang) * rad);
+                    let rad = (15 + Math.sin(mark.seed * b) * 5) * GAME_SCALE;
+                    ctx.lineTo(mx + Math.cos(ang) * rad, my + Math.sin(ang) * rad);
                 }
                 ctx.closePath(); ctx.fill();
             }
@@ -808,45 +823,26 @@ class Projectile {
     constructor(x, y, vx, vy, type, isPlayer) {
         this.x = x;
         this.y = y;
-        this.vx = vx * scale; // Scale initial velocity
-        this.vy = vy * scale;
+        this.vx = vx;
+        this.vy = vy;
         this.type = type;
         this.isPlayer = isPlayer;
         this.active = true;
-        this.width = 30 * scale;
-        this.height = 30 * scale;
-        this.rotation = 0;
-        this.gravity = 0.5 * scale;
-        this.bounceFactor = 0.6;
-        this.friction = 0.99;
-        this.timer = 0; // For Mic/Tomato special effects
+        this.emoji = this.getEmoji();
+    }
+
+    getEmoji() {
+        const emojis = { 'egg': '🥚', 'chappal': '👡', 'mic': '🎤', 'banana': '🍌', 'tomato': '🍅', 'bullet': '🔫' };
+        return emojis[this.type] || '❓';
     }
 
     update() {
-        if (!this.active) return false;
-
         this.x += this.vx;
         this.y += this.vy;
+
         // Bullet pays no respect to gravity
         if (this.type !== 'bullet') {
-            this.vy += this.gravity;
-        }
-        this.rotation += 0.2;
-
-        const groundLevel = canvas.height * 0.75 + (180 * scale);
-
-        // Ground Bounce
-        if (this.y + this.height > groundLevel) {
-            this.y = groundLevel - this.height;
-            this.vy *= -this.bounceFactor;
-            this.vx *= this.friction;
-
-            if (Math.abs(this.vy) < (1 * scale)) {
-                this.active = false; // Stop rolling
-                // Spawn debris
-                spawnParticles(this.x, this.y, this.type, 5);
-                return false;
-            }
+            this.vy += gravity;
         }
 
         if (this.y > canvas.height - 100 || this.x < -100 || this.x > canvas.width + 100) {
@@ -861,17 +857,17 @@ class Projectile {
             // Draw Bullet Trail
             ctx.fillStyle = '#ffff00';
             ctx.beginPath();
-            ctx.arc(this.x, this.y, 5, 0, Math.PI * 2);
+            ctx.arc(this.x, this.y, 5 * GAME_SCALE, 0, Math.PI * 2);
             ctx.fill();
 
             ctx.strokeStyle = 'rgba(255, 255, 0, 0.5)';
-            ctx.lineWidth = 2;
+            ctx.lineWidth = 2 * GAME_SCALE;
             ctx.beginPath();
             ctx.moveTo(this.x, this.y);
             ctx.lineTo(this.x - (this.vx * 2), this.y - (this.vy * 2)); // Trail
             ctx.stroke();
         } else {
-            ctx.font = '40px Arial';
+            ctx.font = `${40 * GAME_SCALE}px Arial`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText(this.emoji, this.x, this.y);
@@ -1004,10 +1000,10 @@ function gameLoop() {
 
     // Ground (Detailed)
     ctx.fillStyle = '#444'; // Asphalt
-    ctx.fillRect(0, canvas.height - 100, canvas.width, 100);
+    ctx.fillRect(0, GROUND_Y, canvas.width, canvas.height - GROUND_Y);
     // Road line
     ctx.fillStyle = '#666';
-    ctx.fillRect(0, canvas.height - 55, canvas.width, 10);
+    ctx.fillRect(0, GROUND_Y + 45 * GAME_SCALE, canvas.width, 10 * GAME_SCALE);
 
     drawTrajectory();
 
@@ -1378,10 +1374,11 @@ function drawTrajectory() {
         // Landing indicator
         ctx.setLineDash([]);
         ctx.beginPath();
-        ctx.arc(simX, simY, 12, 0, Math.PI * 2);
+        ctx.arc(simX, simY, 12 * GAME_SCALE, 0, Math.PI * 2);
         ctx.fillStyle = 'rgba(0, 255, 255, 0.2)';
         ctx.fill();
         ctx.strokeStyle = '#00ffff';
+        ctx.lineWidth = 2 * GAME_SCALE;
         ctx.stroke();
 
         ctx.restore();
