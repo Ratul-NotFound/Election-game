@@ -171,40 +171,115 @@ function spawnParticles(x, y, type, count = 5) {
     }
 }
 let gravity = 0.5;
-let scaleRatio = 1;
+let selectedCandidate = 'abbas';
+let currentAmmo = 'egg';
+let animationFrameId = null;
 
-// ... (other vars) ...
+// Assets
+const abbasImg = new Image(); abbasImg.src = '/assets/images/Abbas.png';
+const nasirImg = new Image(); nasirImg.src = '/assets/images/Nasir.png';
+
+// Audio
+const bgMusic = document.getElementById('bg-music');
+const hitSound = document.getElementById('hit-sound');
+const failSound = document.getElementById('fail-sound');
+
+let audioCtx, gainNode;
+function initAudio() {
+    if (audioCtx) return;
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    gainNode = audioCtx.createGain();
+    gainNode.gain.value = 2.5; // BOOST FACTOR: Amplifying hit sounds
+    gainNode.connect(audioCtx.destination);
+}
+
+// Touch & Mouse Controls Logic
+const touchMap = {
+    'btn-left': 'ArrowLeft',
+    'btn-right': 'ArrowRight',
+    'btn-jump': ' ',
+    'btn-dash': 'Shift'
+};
+
+Object.keys(touchMap).forEach(id => {
+    const btn = document.getElementById(id);
+    if (!btn) return;
+
+    const activate = (e) => {
+        if (e.cancelable) e.preventDefault();
+        e.stopPropagation();
+        keys[touchMap[id]] = true;
+        btn.classList.add('active');
+
+        // Handle Jump immediately
+        if (touchMap[id] === ' ' && player.onGround && gameActive) {
+            player.vy = -12;
+        }
+    };
+
+    const deactivate = (e) => {
+        if (e.cancelable) e.preventDefault();
+        keys[touchMap[id]] = false;
+        btn.classList.remove('active');
+    };
+
+    // Touch Events
+    btn.addEventListener('touchstart', activate, { passive: false });
+    btn.addEventListener('touchend', deactivate);
+
+    // Mouse Events (For Desktop/Hybrid)
+    btn.addEventListener('mousedown', activate);
+    btn.addEventListener('mouseup', deactivate);
+    btn.addEventListener('mouseleave', deactivate);
+});
+
+// Character Selection
+charCards.forEach(card => {
+    card.addEventListener('click', () => {
+        charCards.forEach(c => c.classList.remove('active'));
+        card.classList.add('active');
+        selectedCandidate = card.dataset.candidate;
+    });
+});
+
+// Ammo Selection
+ammoOptions.forEach(opt => {
+    opt.addEventListener('click', () => {
+        ammoOptions.forEach(o => o.classList.remove('active'));
+        opt.classList.add('active');
+        currentAmmo = opt.dataset.ammo;
+    });
+});
+
+let gameScale = 1;
+let vWidth = 1200; // Virtual width
+let vHeight = 800; // Virtual height
 
 function resize() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
 
-    // Calculate Scale Ratio (Base height: 720px)
-    scaleRatio = Math.min(canvas.width / 1280, canvas.height / 720);
+    // Scale based on height to fit content vertically
+    // Target height: 768px (standard laptop/tablets)
+    gameScale = Math.min(1, window.innerHeight / 768);
+    // Ensure minimum scale for very small screens
+    gameScale = Math.max(0.5, gameScale);
 
-    // Adjust Gravity based on scale
-    gravity = 0.5 * scaleRatio;
-
-    // Reposition Ground
-    const groundY = canvas.height * 0.9;
-
-    if (player) {
-        player.resize();
-        opponent.resize();
-    }
+    vWidth = canvas.width / gameScale;
+    vHeight = canvas.height / gameScale;
 }
 window.addEventListener('resize', resize);
+resize();
 
 class Fighter {
     constructor(isPlayer, type) {
         this.isPlayer = isPlayer;
         this.type = type; // 'abbas' or 'nasir'
-        this.baseWidth = 100;
-        this.baseHeight = 200;
-        this.width = this.baseWidth * scaleRatio;
-        this.height = this.baseHeight * scaleRatio;
-
-        this.maxHealth = 1000;
+        this.width = 100;
+        this.height = 200;
+        this.x = isPlayer ? 100 : vWidth - 200;
+        this.y = vHeight - 300;
+        this.maxHealth = 1000; // Extreme HP for endless play
         this.health = 1000;
         this.img = type === 'abbas' ? abbasImg : nasirImg;
         this.vy = 0;
@@ -216,23 +291,6 @@ class Fighter {
         this.vx = 0; // Knockback velocity
         this.rotation = 0; // Torso lean
         this.muzzleFlash = 0; // Timer for muzzle flash
-
-        // Initial Position
-        this.resize();
-    }
-
-    resize() {
-        this.width = this.baseWidth * scaleRatio;
-        this.height = this.baseHeight * scaleRatio;
-
-        // Keep them on screen and ground
-        this.y = (canvas.height * 0.9) - this.height;
-
-        if (this.isPlayer) {
-            this.x = Math.max(0, Math.min(this.x, canvas.width * 0.5));
-        } else {
-            this.x = Math.max(canvas.width * 0.5, Math.min(this.x, canvas.width - this.width));
-        }
     }
 
     update() {
@@ -242,26 +300,7 @@ class Fighter {
 
         // Boundaries
         if (this.x < 0) this.x = 0;
-        if (this.x > canvas.width - this.width) this.x = canvas.width - this.width;
-
-        // Gravity
-        this.y += this.vy;
-        const groundLimit = (canvas.height * 0.9) - this.height;
-
-        if (this.y < groundLimit) {
-            this.vy += gravity;
-            this.onGround = false;
-        } else {
-            this.y = groundLimit;
-            // distinct bounce prevention
-            if (this.vy > 0) this.vy = 0;
-            this.onGround = true;
-
-            // Slide dust
-            if (Math.abs(this.vx) > 2) {
-                spawnParticles(this.x + this.width / 2, this.y + this.height, 'dust', 1);
-            }
-        }
+        if (this.x > vWidth - this.width) this.x = vWidth - this.width;
 
         // Torso Lean (Based on hit stun or velocity)
         if (this.hitStun > 0) {
@@ -283,6 +322,23 @@ class Fighter {
             mark.life--;
             return mark.life > 0;
         });
+
+        // Gravity
+        this.y += this.vy;
+        const groundLimit = vHeight - 300;
+        if (this.y < groundLimit) {
+            this.vy += gravity;
+            this.onGround = false;
+        } else {
+            this.y = groundLimit;
+            this.vy = 0;
+            this.onGround = true;
+
+            // Slide dust
+            if (Math.abs(this.vx) > 2) {
+                spawnParticles(this.x + 50, this.y + 190, 'dust', 1);
+            }
+        }
 
         // Player Movement Logic
         if (this.isPlayer && gameActive) {
@@ -349,7 +405,7 @@ class Fighter {
 
     draw() {
         // 1. Draw Shadow (Absolute coordinates, beneath character)
-        const groundY = canvas.height - 100;
+        const groundY = vHeight - 100;
         let shadowWidth = 60 * (1 - (groundY - (this.y + 190)) / 400);
         let shadowAlpha = 0.3 * (1 - (groundY - (this.y + 190)) / 400);
 
@@ -783,7 +839,7 @@ class Projectile {
             this.vy += gravity;
         }
 
-        if (this.y > canvas.height - 100 || this.x < -100 || this.x > canvas.width + 100) {
+        if (this.y > vHeight - 100 || this.x < -100 || this.x > vWidth + 100) {
             this.active = false;
         }
 
@@ -938,10 +994,10 @@ function gameLoop() {
 
     // Ground (Detailed)
     ctx.fillStyle = '#444'; // Asphalt
-    ctx.fillRect(0, canvas.height - 100, canvas.width, 100);
+    ctx.fillRect(0, vHeight - 100, vWidth, 100);
     // Road line
     ctx.fillStyle = '#666';
-    ctx.fillRect(0, canvas.height - 55, canvas.width, 10);
+    ctx.fillRect(0, vHeight - 55, vWidth, 10);
 
     drawTrajectory();
 
@@ -969,6 +1025,7 @@ function gameLoop() {
         return active;
     });
 
+    ctx.restore(); // Restore scaling
     animationFrameId = requestAnimationFrame(gameLoop);
 }
 
@@ -1207,8 +1264,8 @@ let mouseX = 0, mouseY = 0;
 canvas.addEventListener('mousemove', (e) => {
     if (!gameActive) return;
     let rect = canvas.getBoundingClientRect();
-    mouseX = e.clientX - rect.left;
-    mouseY = e.clientY - rect.top;
+    mouseX = (e.clientX - rect.left) / gameScale;
+    mouseY = (e.clientY - rect.top) / gameScale;
 });
 
 canvas.addEventListener('mousedown', (e) => {
@@ -1234,8 +1291,8 @@ canvas.addEventListener('touchstart', (e) => {
     if (!gameActive) return;
     e.preventDefault();
     let rect = canvas.getBoundingClientRect();
-    let touchX = e.touches[0].clientX - rect.left;
-    let touchY = e.touches[0].clientY - rect.top;
+    let touchX = (e.touches[0].clientX - rect.left) / gameScale;
+    let touchY = (e.touches[0].clientY - rect.top) / gameScale;
 
     let startX = player.x + 80;
     let startY = player.y + 80;
@@ -1305,7 +1362,7 @@ function drawTrajectory() {
             }
 
             ctx.lineTo(simX, simY);
-            if (simY > canvas.height - 100 || simX > canvas.width || simX < 0) break;
+            if (simY > vHeight - 100 || simX > vWidth || simX < 0) break;
         }
         ctx.stroke();
 

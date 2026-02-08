@@ -68,26 +68,35 @@ body {
     font-family: 'Outfit', sans-serif;
 }
 
-/* Responsive Adjustments */
 .glass-panel {
     background: rgba(0, 0, 0, 0.8);
     backdrop-filter: blur(10px);
     border: 1px solid var(--glass-border);
     border-radius: 20px;
-    padding: clamp(1rem, 3vmin, 3rem);
+    padding: 2rem;
     text-align: center;
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);
-    max-width: 90vw;
-    width: min(600px, 90%);
+    max-width: 600px;
+    width: 90%;
     animation: zoomIn 0.5s ease;
     z-index: 10;
     position: relative;
-    max-height: 90vh;
-    overflow-y: auto;
+}
+
+@keyframes zoomIn {
+    from {
+        opacity: 0;
+        transform: scale(0.8);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
 }
 
 .title-bn {
-    font-size: clamp(2rem, 8vmin, 4rem);
+    font-size: 3rem;
     font-weight: 900;
     color: var(--gold);
     text-shadow: 0 0 10px rgba(255, 204, 0, 0.5);
@@ -95,27 +104,128 @@ body {
 }
 
 .subtitle-bn {
-    font-size: clamp(0.9rem, 3vmin, 1.5rem);
+    font-size: 1.2rem;
     color: #ccc;
     margin-bottom: 2rem;
+}
+
+/* Mobile Rotation Warning */
+#rotate-warning {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: #000;
+    z-index: 10000;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    color: white;
+    text-align: center;
+    gap: 20px;
+}
+
+.rotate-icon {
+    font-size: 4rem;
+    animation: rotatePhone 2s infinite ease-in-out;
+}
+
+@keyframes rotatePhone {
+
+    0%,
+    100% {
+        transform: rotate(0deg);
+    }
+
+    50% {
+        transform: rotate(90deg);
+    }
+}
+
+@media screen and (orientation: portrait) and (max-width: 900px) {
+    #rotate-warning {
+        display: flex;
+    }
+
+    #app {
+        display: none;
+    }
+}
+
+/* Stats Ticker */
+.stats-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 15px;
+    background: rgba(0, 0, 0, 0.6);
+    padding: 10px 20px;
+    border-radius: 50px;
+    margin-top: 1.5rem;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.stat-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.stat-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    color: #aaa;
+    letter-spacing: 1px;
+}
+
+.stat-value {
+    font-size: 1.2rem;
+    font-weight: 900;
+    color: var(--gold);
+    font-family: 'Outfit', sans-serif;
+}
+
+.stat-divider {
+    width: 1px;
+    height: 20px;
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.selection-container {
+    margin: 1.5rem 0;
+}
+
+.candidates-row {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
 }
 
 .char-card {
     background: rgba(255, 255, 255, 0.05);
     border: 2px solid transparent;
     border-radius: 10px;
-    padding: 10px;
+    padding: 15px;
     cursor: pointer;
     transition: all 0.2s;
-    width: clamp(100px, 20vw, 160px);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
+    width: 140px;
+}
+
+.char-card:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.char-card.active {
+    border-color: var(--gold);
+    background: rgba(255, 204, 0, 0.2);
+    transform: scale(1.05);
 }
 
 .char-card img {
-    width: clamp(60px, 12vw, 100px);
-    height: clamp(60px, 12vw, 100px);
+    width: 100px;
+    height: 100px;
     border-radius: 50%;
     object-fit: cover;
     margin-bottom: 10px;
@@ -126,8 +236,8 @@ body {
     background: linear-gradient(45deg, var(--secondary), #d61c31);
     color: white;
     border: none;
-    padding: clamp(0.8rem, 2vmin, 1.2rem) clamp(2rem, 5vmin, 3rem);
-    font-size: clamp(1.2rem, 4vmin, 2rem);
+    padding: 1rem 2.5rem;
+    font-size: 1.5rem;
     font-weight: 700;
     border-radius: 50px;
     cursor: pointer;
@@ -136,28 +246,207 @@ body {
     margin-top: 1rem;
 }
 
-@media (max-width: 600px) {
-    .candidates-row {
-        gap: 10px;
+.primary-btn-bn:active {
+    transform: scale(0.95);
+}
+
+/* Fight Stage */
+#game-screen {
+    background: radial-gradient(circle at center, #2b2b2b 0%, #000 100%);
+    background-size: cover;
+    background-position: bottom;
+}
+
+#game-canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+.hud-layer {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    right: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    z-index: 100;
+}
+
+.fighter-hud {
+    width: 40%;
+}
+
+.fighter-name {
+    font-size: 1.5rem;
+    font-weight: 900;
+    text-transform: uppercase;
+    text-shadow: 2px 2px 0 #000;
+    margin-bottom: 5px;
+}
+
+.health-bar-container {
+    width: 100%;
+    height: 20px;
+    background: #444;
+    border: 2px solid #fff;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.health-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #00ff00, #ffff00);
+    transition: width 0.3s ease-out;
+}
+
+.izzat-text {
+    font-size: 0.8rem;
+    text-align: right;
+    margin-top: 2px;
+    font-style: italic;
+    color: #aaa;
+}
+
+.vs-badge {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 3rem;
+    font-weight: 900;
+    color: var(--secondary);
+    text-shadow: 0 0 10px red;
+    top: 10px;
+}
+
+/* Ammo Selector */
+.ammo-selector {
+    position: absolute;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 15px;
+    background: rgba(0, 0, 0, 0.8);
+    padding: 10px 20px;
+    border-radius: 30px;
+    border: 1px solid var(--glass-border);
+}
+
+.ammo-option {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    cursor: pointer;
+    opacity: 0.5;
+    transition: 0.2s;
+}
+
+.ammo-option.active,
+.ammo-option:hover {
+    opacity: 1;
+    transform: scale(1.1);
+}
+
+.ammo-icon {
+    font-size: 2rem;
+}
+
+.ammo-name {
+    font-size: 0.8rem;
+    font-weight: bold;
+}
+
+/* Animations */
+.shake {
+    animation: shake 0.5s;
+}
+
+@keyframes shake {
+    0% {
+        transform: translate(1px, 1px) rotate(0deg);
     }
 
-    .char-card {
-        padding: 5px;
+    10% {
+        transform: translate(-1px, -2px) rotate(-1deg);
+    }
+
+    20% {
+        transform: translate(-3px, 0px) rotate(1deg);
+    }
+
+    30% {
+        transform: translate(3px, 2px) rotate(0deg);
+    }
+
+    40% {
+        transform: translate(1px, -1px) rotate(1deg);
+    }
+
+    50% {
+        transform: translate(-1px, 2px) rotate(-1deg);
+    }
+
+    60% {
+        transform: translate(-3px, 1px) rotate(0deg);
+    }
+
+    70% {
+        transform: translate(3px, 1px) rotate(-1deg);
+    }
+
+    80% {
+        transform: translate(-1px, -1px) rotate(1deg);
+    }
+
+    90% {
+        transform: translate(1px, 2px) rotate(0deg);
+    }
+
+    100% {
+        transform: translate(1px, -2px) rotate(-1deg);
+    }
+}
+
+.damage-text {
+    z-index: 1000;
+    white-space: nowrap;
+    animation: popOut 0.5s ease-out;
+}
+
+@keyframes popOut {
+    0% {
+        transform: scale(0.5) rotate(-10deg);
+        opacity: 0;
+    }
+
+    50% {
+        transform: scale(1.2) rotate(5deg);
+        opacity: 1;
+    }
+
+    100% {
+        transform: scale(1) rotate(0deg);
+        opacity: 0.8;
+    }
+}
+
+@media (max-width: 600px) {
+    .title-bn {
+        font-size: 2rem;
+    }
+
+    .candidates-row {
+        flex-direction: column;
+        align-items: center;
     }
 
     .ammo-selector {
-        width: 95%;
-        bottom: 15vh;
-        padding: 5px 10px;
-        gap: 5px;
-    }
-
-    .ammo-icon {
-        font-size: 1.5rem;
-    }
-
-    .touch-controls {
-        bottom: 2vh;
+        width: 90%;
+        justify-content: space-around;
+        bottom: 80px;
+        /* Make room for controls */
     }
 }
 
