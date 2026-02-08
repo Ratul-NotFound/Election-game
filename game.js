@@ -244,6 +244,25 @@ class Fighter {
         if (this.x < 0) this.x = 0;
         if (this.x > canvas.width - this.width) this.x = canvas.width - this.width;
 
+        // Gravity
+        this.y += this.vy;
+        const groundLimit = (canvas.height * 0.9) - this.height;
+
+        if (this.y < groundLimit) {
+            this.vy += gravity;
+            this.onGround = false;
+        } else {
+            this.y = groundLimit;
+            // distinct bounce prevention
+            if (this.vy > 0) this.vy = 0;
+            this.onGround = true;
+
+            // Slide dust
+            if (Math.abs(this.vx) > 2) {
+                spawnParticles(this.x + this.width / 2, this.y + this.height, 'dust', 1);
+            }
+        }
+
         // Torso Lean (Based on hit stun or velocity)
         if (this.hitStun > 0) {
             this.rotation = (this.vx * -0.05); // Lean back from hit
@@ -264,23 +283,6 @@ class Fighter {
             mark.life--;
             return mark.life > 0;
         });
-
-        // Gravity
-        this.y += this.vy;
-        const groundLimit = canvas.height - 300;
-        if (this.y < groundLimit) {
-            this.vy += gravity;
-            this.onGround = false;
-        } else {
-            this.y = groundLimit;
-            this.vy = 0;
-            this.onGround = true;
-
-            // Slide dust
-            if (Math.abs(this.vx) > 2) {
-                spawnParticles(this.x + 50, this.y + 190, 'dust', 1);
-            }
-        }
 
         // Player Movement Logic
         if (this.isPlayer && gameActive) {
