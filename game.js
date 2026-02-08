@@ -213,7 +213,7 @@ Object.keys(touchMap).forEach(id => {
 
         // Handle Jump immediately
         if (touchMap[id] === ' ' && player.onGround && gameActive) {
-            player.vy = -12;
+            player.vy = -12 * GAME_SCALE;
         }
     };
 
@@ -265,6 +265,12 @@ function resize() {
     if (GAME_SCALE < 0.5) GAME_SCALE = 0.5; // Floor scale for tiny screens
 
     GROUND_Y = canvas.height * 0.85;
+
+    // Reset mouse to player center to prevent giant initial line
+    if (player) {
+        mouseX = player.x + player.width / 2;
+        mouseY = player.y + player.height / 2;
+    }
 }
 window.addEventListener('resize', resize);
 resize();
@@ -1271,7 +1277,8 @@ let dragX = 0;
 let dragY = 0;
 
 function getAimData(inputX, inputY) {
-    let startX = player.x + player.width * 0.8;
+    // Shot origin should be near the character's hand/midsection
+    let startX = player.x + (player.isPlayer ? player.width * 0.7 : player.width * 0.3);
     let startY = player.y + player.height * 0.4;
 
     let dx = inputX - startX;
@@ -1280,11 +1287,11 @@ function getAimData(inputX, inputY) {
     let angle = Math.atan2(dy, dx);
     let dist = Math.sqrt(dx * dx + dy * dy);
 
-    // Scale power based on screen size but keep it consistent for gameplay
-    let power = Math.min(dist * 0.1, 40 * GAME_SCALE);
-    power = Math.max(power, 10 * GAME_SCALE);
+    // Cap power and scale it correctly
+    let power = Math.min(dist * 0.12, 35 * GAME_SCALE);
+    power = Math.max(power, 5 * GAME_SCALE);
 
-    return { angle, power, startX, startY };
+    return { angle, power, startX, startY, dx, dy };
 }
 
 // Mouse Aim/Shoot
@@ -1361,8 +1368,14 @@ function drawTrajectory() {
             vy = Math.sin(aim.angle) * aim.power;
         }
 
+        // Only draw if we have a real input (not the default (0,0))
+        if (!isDragging && mouseX === 0 && mouseY === 0) {
+            ctx.restore();
+            return;
+        }
+
         // Hide if aiming backwards
-        if (dx < 0 && player.isPlayer) {
+        if (aim.dx < 0 && player.isPlayer) {
             ctx.restore();
             return;
         }
