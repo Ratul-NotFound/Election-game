@@ -176,8 +176,8 @@ let currentAmmo = 'egg';
 let animationFrameId = null;
 
 // Assets
-const abbasImg = new Image(); abbasImg.src = 'assets/images/Abbas.png';
-const nasirImg = new Image(); nasirImg.src = 'assets/images/Nasir.png';
+const abbasImg = new Image(); abbasImg.src = '/assets/images/Abbas.png';
+const nasirImg = new Image(); nasirImg.src = '/assets/images/Nasir.png';
 
 // Audio
 const bgMusic = document.getElementById('bg-music');

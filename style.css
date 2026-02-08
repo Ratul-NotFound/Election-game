@@ -48,7 +48,7 @@ body {
 
 /* Landing Screen */
 #landing-screen {
-    background: linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)), url('assets/images/landing_bg.png') center/cover;
+    background: linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)), url('/assets/images/landing_bg.png') center/cover;
     position: relative;
     overflow: hidden;
 }
