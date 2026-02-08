@@ -1284,12 +1284,9 @@ function getAimData(inputX, inputY) {
     let dx = inputX - startX;
     let dy = inputY - startY;
 
-    let angle = Math.atan2(dy, dx);
-    let dist = Math.sqrt(dx * dx + dy * dy);
-
-    // Cap power and scale it correctly
-    let power = Math.min(dist * 0.12, 35 * GAME_SCALE);
-    power = Math.max(power, 5 * GAME_SCALE);
+    // Increase power sensitivity slightly for mobile
+    let power = Math.min(dist * 0.15, 45 * GAME_SCALE);
+    power = Math.max(power, 8 * GAME_SCALE);
 
     return { angle, power, startX, startY, dx, dy };
 }
@@ -1396,7 +1393,7 @@ function drawTrajectory() {
             }
 
             ctx.lineTo(simX, simY);
-            if (simY > canvas.height - 100 || simX > canvas.width || simX < 0) break;
+            if (simY > GROUND_Y || simX > canvas.width || simX < 0) break;
         }
         ctx.stroke();
 
