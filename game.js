@@ -176,54 +176,190 @@ let currentAmmo = 'egg';
 let animationFrameId = null;
 let gameTimer = 0;
 
-// Pre-generate buildings for consistent scene
-let buildings = [];
-function generateBuildings() {
-    buildings = [];
-    const count = Math.ceil(canvas.width / 80) + 2;
-    let bx = -40;
-    for (let i = 0; i < count; i++) {
-        const w = 50 + Math.random() * 60;
-        const h = 80 + Math.random() * 180;
-        const color = ['#3a3a5c', '#4a4a6a', '#2d3a4a', '#4a3a3a', '#3a4a3a'][Math.floor(Math.random() * 5)];
-        const windows = Math.floor(Math.random() * 3) + 2;
-        const floors = Math.floor(h / 30);
-        buildings.push({ x: bx, w, h, color, windows, floors });
-        bx += w + 5 + Math.random() * 15;
+// --- STATIC BACKGROUND (Pre-rendered to offscreen canvas) ---
+let bgCanvas = null;
+let bgNeedsRedraw = true;
+
+function generateBackground() {
+    bgCanvas = document.createElement('canvas');
+    bgCanvas.width = canvas.width;
+    bgCanvas.height = canvas.height;
+    const bg = bgCanvas.getContext('2d');
+
+    // === SKY ===
+    let skyGrad = bg.createLinearGradient(0, 0, 0, GROUND_Y);
+    skyGrad.addColorStop(0, '#1a1a2e');
+    skyGrad.addColorStop(0.3, '#16213e');
+    skyGrad.addColorStop(0.55, '#0f3460');
+    skyGrad.addColorStop(0.8, '#e94560');
+    skyGrad.addColorStop(1, '#ff6b6b');
+    bg.fillStyle = skyGrad;
+    bg.fillRect(0, 0, bgCanvas.width, GROUND_Y);
+
+    // === STARS ===
+    for (let i = 0; i < 80; i++) {
+        const sx = Math.random() * bgCanvas.width;
+        const sy = Math.random() * GROUND_Y * 0.6;
+        const sr = 0.5 + Math.random() * 1.5;
+        bg.fillStyle = `rgba(255, 255, 255, ${0.3 + Math.random() * 0.7})`;
+        bg.beginPath();
+        bg.arc(sx, sy, sr, 0, Math.PI * 2);
+        bg.fill();
     }
-}
 
-function drawBuildings() {
-    if (buildings.length === 0) generateBuildings();
-    const baseY = GROUND_Y;
-    buildings.forEach(b => {
-        // Building body
-        ctx.fillStyle = b.color;
-        ctx.fillRect(b.x, baseY - b.h, b.w, b.h);
+    // === MOON ===
+    const moonX = bgCanvas.width * 0.82;
+    const moonY = GROUND_Y * 0.18;
+    const moonR = 30 * GAME_SCALE;
+    bg.fillStyle = '#fff8dc';
+    bg.shadowColor = 'rgba(255, 248, 220, 0.5)';
+    bg.shadowBlur = 40;
+    bg.beginPath();
+    bg.arc(moonX, moonY, moonR, 0, Math.PI * 2);
+    bg.fill();
+    bg.shadowBlur = 0;
+    // Moon craters
+    bg.fillStyle = 'rgba(200, 190, 160, 0.3)';
+    bg.beginPath(); bg.arc(moonX - 8, moonY - 5, 6, 0, Math.PI * 2); bg.fill();
+    bg.beginPath(); bg.arc(moonX + 10, moonY + 8, 4, 0, Math.PI * 2); bg.fill();
+    bg.beginPath(); bg.arc(moonX + 3, moonY - 10, 3, 0, Math.PI * 2); bg.fill();
 
-        // Building edge highlight
-        ctx.fillStyle = 'rgba(255,255,255,0.05)';
-        ctx.fillRect(b.x, baseY - b.h, 3, b.h);
+    // === BACK LAYER BUILDINGS (far, dark silhouettes) ===
+    const farColors = ['#0d1117', '#111827', '#0f172a', '#131a2e'];
+    let bx = -20;
+    while (bx < bgCanvas.width + 50) {
+        const w = 40 + Math.random() * 70;
+        const h = 60 + Math.random() * 130;
+        bg.fillStyle = farColors[Math.floor(Math.random() * farColors.length)];
+        bg.fillRect(bx, GROUND_Y - h, w, h);
+        // Tiny windows
+        for (let fy = GROUND_Y - h + 10; fy < GROUND_Y - 8; fy += 16) {
+            for (let fx = bx + 6; fx < bx + w - 6; fx += 12) {
+                if (Math.random() > 0.5) {
+                    bg.fillStyle = `rgba(255, 200, 80, ${0.15 + Math.random() * 0.25})`;
+                    bg.fillRect(fx, fy, 5, 6);
+                }
+            }
+        }
+        bx += w + 2 + Math.random() * 8;
+    }
 
-        // Windows
-        for (let f = 0; f < b.floors; f++) {
-            for (let wn = 0; wn < b.windows; wn++) {
-                let wx = b.x + 8 + wn * (b.w - 16) / b.windows;
-                let wy = baseY - b.h + 12 + f * 28;
-                let lit = Math.random() > 0.4;
-                ctx.fillStyle = lit ? 'rgba(255, 220, 100, 0.7)' : 'rgba(80, 80, 100, 0.5)';
-                ctx.fillRect(wx, wy, 8, 10);
+    // === FRONT LAYER BUILDINGS (closer, more detail) ===
+    const nearColors = ['#1e293b', '#1f2937', '#27272a', '#292524', '#1c1917'];
+    bx = -30;
+    while (bx < bgCanvas.width + 60) {
+        const w = 55 + Math.random() * 80;
+        const h = 100 + Math.random() * 160;
+        const col = nearColors[Math.floor(Math.random() * nearColors.length)];
+        bg.fillStyle = col;
+        bg.fillRect(bx, GROUND_Y - h, w, h);
+
+        // Left edge highlight
+        bg.fillStyle = 'rgba(255,255,255,0.04)';
+        bg.fillRect(bx, GROUND_Y - h, 3, h);
+
+        // Roof cap
+        bg.fillStyle = 'rgba(0,0,0,0.3)';
+        bg.fillRect(bx - 3, GROUND_Y - h - 4, w + 6, 6);
+
+        // Water tank silhouette (random)
+        if (Math.random() > 0.6) {
+            bg.fillStyle = '#111';
+            const tw = 14 + Math.random() * 10;
+            const th = 10 + Math.random() * 8;
+            const tx = bx + w * 0.3 + Math.random() * w * 0.3;
+            bg.fillRect(tx, GROUND_Y - h - 4 - th, tw, th);
+            // Tank legs
+            bg.fillRect(tx + 2, GROUND_Y - h - 4, 3, 4);
+            bg.fillRect(tx + tw - 5, GROUND_Y - h - 4, 3, 4);
+        }
+
+        // Windows grid
+        const winW = 7, winH = 9, winGapX = 14, winGapY = 18;
+        for (let fy = GROUND_Y - h + 14; fy < GROUND_Y - 12; fy += winGapY) {
+            for (let fx = bx + 8; fx < bx + w - 10; fx += winGapX) {
+                const lit = Math.random() > 0.45;
                 if (lit) {
-                    ctx.fillStyle = 'rgba(255, 220, 100, 0.15)';
-                    ctx.fillRect(wx - 2, wy - 2, 12, 14);
+                    const warmth = Math.random();
+                    bg.fillStyle = warmth > 0.5
+                        ? `rgba(255, 220, 80, ${0.4 + Math.random() * 0.5})`
+                        : `rgba(200, 230, 255, ${0.2 + Math.random() * 0.3})`;
+                    bg.fillRect(fx, fy, winW, winH);
+                    // Window glow
+                    bg.fillStyle = warmth > 0.5
+                        ? 'rgba(255, 200, 50, 0.08)'
+                        : 'rgba(150, 200, 255, 0.05)';
+                    bg.fillRect(fx - 2, fy - 2, winW + 4, winH + 4);
+                } else {
+                    bg.fillStyle = 'rgba(30, 30, 50, 0.6)';
+                    bg.fillRect(fx, fy, winW, winH);
                 }
             }
         }
 
-        // Roof detail
-        ctx.fillStyle = 'rgba(0,0,0,0.2)';
-        ctx.fillRect(b.x - 2, baseY - b.h - 3, b.w + 4, 6);
-    });
+        // Signboard (random neon)
+        if (Math.random() > 0.7 && h > 120) {
+            const signColors = ['#ff6b6b', '#48bb78', '#4299e1', '#ed8936', '#9f7aea'];
+            const sc = signColors[Math.floor(Math.random() * signColors.length)];
+            const sw = 20 + Math.random() * 25;
+            const sy = GROUND_Y - 30 - Math.random() * 40;
+            bg.fillStyle = sc;
+            bg.globalAlpha = 0.7;
+            bg.fillRect(bx + 5, sy, sw, 10);
+            bg.globalAlpha = 0.15;
+            bg.shadowColor = sc;
+            bg.shadowBlur = 15;
+            bg.fillRect(bx + 5, sy, sw, 10);
+            bg.shadowBlur = 0;
+            bg.globalAlpha = 1;
+        }
+
+        bx += w + 3 + Math.random() * 12;
+    }
+
+    // === GROUND ===
+    let groundGrad = bg.createLinearGradient(0, GROUND_Y, 0, bgCanvas.height);
+    groundGrad.addColorStop(0, '#3d3d3d');
+    groundGrad.addColorStop(0.15, '#333');
+    groundGrad.addColorStop(0.5, '#2a2a2a');
+    groundGrad.addColorStop(1, '#1a1a1a');
+    bg.fillStyle = groundGrad;
+    bg.fillRect(0, GROUND_Y, bgCanvas.width, bgCanvas.height - GROUND_Y);
+
+    // Sidewalk/curb
+    bg.fillStyle = '#555';
+    bg.fillRect(0, GROUND_Y, bgCanvas.width, 5 * GAME_SCALE);
+    bg.fillStyle = '#4a4a4a';
+    bg.fillRect(0, GROUND_Y + 5 * GAME_SCALE, bgCanvas.width, 2 * GAME_SCALE);
+
+    // Road center line
+    bg.fillStyle = 'rgba(255, 255, 255, 0.08)';
+    const dashW = 40 * GAME_SCALE;
+    const dashGap = 30 * GAME_SCALE;
+    const markingY = GROUND_Y + 40 * GAME_SCALE;
+    for (let mx = 0; mx < bgCanvas.width; mx += dashW + dashGap) {
+        bg.fillRect(mx, markingY, dashW, 3 * GAME_SCALE);
+    }
+
+    // Drain line
+    bg.fillStyle = '#1a1a1a';
+    bg.fillRect(0, GROUND_Y + 60 * GAME_SCALE, bgCanvas.width, 2 * GAME_SCALE);
+
+    // Street lamp posts
+    for (let lx = 100; lx < bgCanvas.width; lx += 300 + Math.random() * 200) {
+        bg.fillStyle = '#2a2a2a';
+        bg.fillRect(lx, GROUND_Y - 80 * GAME_SCALE, 4 * GAME_SCALE, 80 * GAME_SCALE);
+        // Lamp head
+        bg.fillStyle = '#333';
+        bg.fillRect(lx - 6 * GAME_SCALE, GROUND_Y - 82 * GAME_SCALE, 16 * GAME_SCALE, 5 * GAME_SCALE);
+        // Light glow
+        bg.fillStyle = 'rgba(255, 220, 100, 0.06)';
+        bg.beginPath();
+        bg.arc(lx + 2 * GAME_SCALE, GROUND_Y - 75 * GAME_SCALE, 40 * GAME_SCALE, 0, Math.PI * 2);
+        bg.fill();
+    }
+
+    bgNeedsRedraw = false;
 }
 
 // Assets
@@ -316,6 +452,7 @@ function resize() {
     if (GAME_SCALE < 0.5) GAME_SCALE = 0.5; // Floor scale for tiny screens
 
     GROUND_Y = canvas.height * 0.85;
+    bgNeedsRedraw = true;
 
     // Reposition and rescale fighters on resize
     if (player) {
@@ -1074,7 +1211,7 @@ function startGame() {
     particles = [];
     gameTimer = 0;
     keys = {};
-    generateBuildings();
+    bgNeedsRedraw = true;
 
     player = new Fighter(true, selectedCandidate);
     opponent = new Fighter(false, selectedCandidate === 'abbas' ? 'nasir' : 'abbas');
@@ -1131,55 +1268,9 @@ function gameLoop() {
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Dynamic Sky Gradient
-    let skyGrad = ctx.createLinearGradient(0, 0, 0, GROUND_Y);
-    skyGrad.addColorStop(0, '#5b9bd5');
-    skyGrad.addColorStop(0.4, '#87CEEB');
-    skyGrad.addColorStop(0.8, '#b0d8ef');
-    skyGrad.addColorStop(1, '#d4e8c2');
-    ctx.fillStyle = skyGrad;
-    ctx.fillRect(0, 0, canvas.width, GROUND_Y);
-
-    // Draw Clouds
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
-    clouds.forEach(c => {
-        c.x += c.speed;
-        if (c.x > canvas.width + 100) c.x = -150;
-        ctx.beginPath();
-        ctx.arc(c.x, c.y, c.size * 0.5, 0, Math.PI * 2);
-        ctx.arc(c.x + c.size * 0.3, c.y - c.size * 0.15, c.size * 0.4, 0, Math.PI * 2);
-        ctx.arc(c.x - c.size * 0.2, c.y + c.size * 0.1, c.size * 0.35, 0, Math.PI * 2);
-        ctx.arc(c.x + c.size * 0.5, c.y + c.size * 0.1, c.size * 0.3, 0, Math.PI * 2);
-        ctx.fill();
-    });
-
-    // Background Buildings (Dhaka Silhouette)
-    drawBuildings();
-
-    // Ground (Rich Dhaka Street)
-    let groundGrad = ctx.createLinearGradient(0, GROUND_Y, 0, canvas.height);
-    groundGrad.addColorStop(0, '#555');
-    groundGrad.addColorStop(0.3, '#444');
-    groundGrad.addColorStop(1, '#333');
-    ctx.fillStyle = groundGrad;
-    ctx.fillRect(0, GROUND_Y, canvas.width, canvas.height - GROUND_Y);
-
-    // Curb line
-    ctx.fillStyle = '#666';
-    ctx.fillRect(0, GROUND_Y, canvas.width, 4 * GAME_SCALE);
-
-    // Road markings
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
-    let dashW = 40 * GAME_SCALE;
-    let dashGap = 30 * GAME_SCALE;
-    let markingY = GROUND_Y + 35 * GAME_SCALE;
-    for (let mx = (gameTimer * 0.5) % (dashW + dashGap) - dashW; mx < canvas.width; mx += dashW + dashGap) {
-        ctx.fillRect(mx, markingY, dashW, 4 * GAME_SCALE);
-    }
-
-    // Drain/gutter line
-    ctx.fillStyle = '#2a2a2a';
-    ctx.fillRect(0, GROUND_Y + 55 * GAME_SCALE, canvas.width, 3 * GAME_SCALE);
+    // Draw pre-rendered static background
+    if (bgNeedsRedraw || !bgCanvas) generateBackground();
+    ctx.drawImage(bgCanvas, 0, 0);
 
     drawTrajectory();
 

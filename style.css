@@ -269,14 +269,14 @@ body {
     background: linear-gradient(45deg, var(--secondary), #d61c31);
     color: white;
     border: none;
-    padding: 1rem 2.5rem;
-    font-size: 1.5rem;
+    padding: 0.7rem 2rem;
+    font-size: clamp(1rem, 2.5vh, 1.3rem);
     font-weight: 700;
     border-radius: 50px;
     cursor: pointer;
-    box-shadow: 0 5px 15px rgba(244, 42, 65, 0.4);
+    box-shadow: 0 4px 12px rgba(244, 42, 65, 0.35);
     transition: transform 0.1s;
-    margin-top: 1rem;
+    margin-top: 0.8rem;
 }
 
 .primary-btn-bn:active {
@@ -299,14 +299,16 @@ body {
 
 .hud-layer {
     position: absolute;
-    top: 12px;
-    left: 16px;
-    right: 16px;
+    top: 0;
+    left: 0;
+    right: 0;
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
     z-index: 100;
     pointer-events: none;
+    padding: 8px 14px 12px;
+    background: linear-gradient(to bottom, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.25) 60%, transparent 100%);
 }
 
 .fighter-hud {
@@ -316,21 +318,22 @@ body {
 }
 
 .fighter-name {
-    font-size: clamp(0.7rem, 4.5vh, 1.4rem);
-    font-weight: 900;
+    font-size: clamp(0.65rem, 3.5vh, 1.1rem);
+    font-weight: 700;
     margin-bottom: 2px;
-    text-shadow: 1px 1px 0 #000;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.9), 0 0 8px rgba(0,0,0,0.6);
     color: var(--gold);
+    letter-spacing: 0.5px;
 }
 
 .health-bar-container {
     width: 100%;
-    height: clamp(8px, 1.5vh, 14px);
-    background: rgba(0, 0, 0, 0.6);
-    border: 1.5px solid rgba(255, 255, 255, 0.7);
-    border-radius: 5px;
+    height: clamp(7px, 1.2vh, 12px);
+    background: rgba(0, 0, 0, 0.75);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    border-radius: 4px;
     overflow: hidden;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.5);
 }
 
 .health-bar {
@@ -348,41 +351,44 @@ body {
 }
 
 .izzat-text {
-    font-size: 0.8rem;
+    font-size: 0.55rem;
     text-align: right;
-    margin-top: 2px;
+    margin-top: 1px;
     font-style: italic;
-    color: #aaa;
+    color: rgba(255,255,255,0.4);
+    text-shadow: 0 1px 2px rgba(0,0,0,0.8);
 }
 
 .vs-badge {
     position: absolute;
     left: 50%;
     transform: translateX(-50%);
-    font-size: clamp(1.2rem, 4vh, 2.5rem);
+    font-size: clamp(0.9rem, 3vh, 1.6rem);
     font-weight: 900;
     color: var(--secondary);
-    text-shadow: 0 0 10px rgba(244, 42, 65, 0.6), 0 2px 4px rgba(0,0,0,0.5);
-    top: 6px;
-    letter-spacing: 2px;
+    text-shadow: 0 0 8px rgba(244, 42, 65, 0.5), 0 1px 3px rgba(0,0,0,0.7);
+    top: 2px;
+    letter-spacing: 1px;
+    line-height: 1.1;
+    text-align: center;
 }
 
 /* Ammo Selector */
 .ammo-selector {
     position: absolute;
-    bottom: 12vh;
+    bottom: 10vh;
     left: 50%;
     transform: translateX(-50%);
     display: flex;
-    gap: clamp(8px, 1.5vw, 15px);
-    background: rgba(0, 0, 0, 0.6);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    padding: clamp(6px, 1vh, 10px) clamp(10px, 2vw, 18px);
-    border-radius: 30px;
+    gap: clamp(4px, 1vw, 10px);
+    background: rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    padding: clamp(4px, 0.6vh, 7px) clamp(8px, 1.5vw, 14px);
+    border-radius: 22px;
     z-index: 1000;
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 2px 12px rgba(0,0,0,0.4);
     max-width: 95vw;
 }
 
@@ -391,32 +397,33 @@ body {
     flex-direction: column;
     align-items: center;
     cursor: pointer;
-    opacity: 0.4;
-    transition: all 0.2s ease;
-    padding: 4px 6px;
-    border-radius: 12px;
+    opacity: 0.35;
+    transition: all 0.15s ease;
+    padding: 3px 5px;
+    border-radius: 10px;
 }
 
 .ammo-option.active {
     opacity: 1;
-    transform: scale(1.15);
-    background: rgba(255, 204, 0, 0.2);
-    box-shadow: 0 0 10px rgba(255, 204, 0, 0.3);
+    transform: scale(1.1);
+    background: rgba(255, 204, 0, 0.15);
+    box-shadow: 0 0 8px rgba(255, 204, 0, 0.25);
 }
 
 .ammo-option:hover {
-    opacity: 0.8;
+    opacity: 0.75;
     transform: scale(1.05);
 }
 
 .ammo-icon {
-    font-size: clamp(1.4rem, 3vh, 2.2rem);
+    font-size: clamp(1.1rem, 2.5vh, 1.7rem);
 }
 
 .ammo-name {
-    font-size: clamp(0.55rem, 1vh, 0.8rem);
+    font-size: clamp(0.45rem, 0.8vh, 0.65rem);
     font-weight: bold;
-    margin-top: 2px;
+    margin-top: 1px;
+    opacity: 0.8;
 }
 
 /* Animations */
@@ -531,61 +538,67 @@ body {
 
 @media (max-height: 500px) {
     .hud-layer {
-        top: 6px;
-        left: 10px;
-        right: 10px;
+        padding: 4px 10px 8px;
     }
 
     .fighter-hud {
-        width: 30vw;
+        width: 28vw;
     }
 
     .fighter-name {
-        font-size: 0.8rem;
+        font-size: 0.7rem;
     }
 
     .health-bar-container {
-        height: 6px;
+        height: 5px;
     }
 
     .vs-badge {
-        font-size: 1.2rem;
-        top: 4px;
+        font-size: 0.9rem;
+        top: 0;
     }
 
     .ammo-selector {
-        bottom: 60px;
-        gap: 6px;
-        padding: 4px 10px;
+        bottom: 52px;
+        gap: 3px;
+        padding: 3px 8px;
+    }
+
+    .ammo-icon {
+        font-size: 1rem;
+    }
+
+    .ammo-name {
+        font-size: 0.45rem;
     }
 
     .touch-controls {
-        bottom: max(8px, env(safe-area-inset-bottom));
+        bottom: max(6px, env(safe-area-inset-bottom));
     }
 
     .touch-btn {
-        width: 50px;
-        height: 50px;
-        font-size: 1.3rem;
+        width: 42px;
+        height: 42px;
+        font-size: 1rem;
     }
 
     .touch-btn.large {
-        width: 60px;
-        height: 60px;
-        font-size: 1.6rem;
+        width: 50px;
+        height: 50px;
+        font-size: 1.2rem;
     }
 
     .touch-group {
-        gap: 10vw;
+        gap: 8vw;
     }
 }
 
 /* Touch Controls (Enhanced) */
 .touch-controls {
     position: absolute;
-    bottom: max(30px, env(safe-area-inset-bottom));
-    left: max(20px, env(safe-area-inset-left));
-    right: max(20px, env(safe-area-inset-right));
+    bottom: max(14px, env(safe-area-inset-bottom));
+    left: max(14px, env(safe-area-inset-left));
+    right: max(14px, env(safe-area-inset-right));
     display: flex;
     justify-content: space-between;
     pointer-events: none;
@@ -600,39 +613,39 @@ body {
 }
 
 .touch-btn {
-    width: 75px;
-    height: 75px;
-    background: rgba(255, 255, 255, 0.1);
-    border: 2px solid rgba(255, 255, 255, 0.4);
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+    width: 52px;
+    height: 52px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1.5px solid rgba(255, 255, 255, 0.25);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 2rem;
-    color: white;
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
+    font-size: 1.3rem;
+    color: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
     touch-action: manipulation;
     user-select: none;
-    transition: all 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    transition: all 0.12s ease;
     cursor: pointer;
 }
 
 .touch-btn:active,
 .touch-btn.active {
-    background: rgba(255, 204, 0, 0.6);
-    transform: scale(0.9);
+    background: rgba(255, 204, 0, 0.5);
+    transform: scale(0.88);
     border-color: var(--gold);
-    box-shadow: 0 0 15px rgba(255, 204, 0, 0.6);
+    box-shadow: 0 0 10px rgba(255, 204, 0, 0.4);
 }
 
 .touch-btn.large {
-    width: 90px;
-    height: 90px;
-    font-size: 2.5rem;
-    background: rgba(244, 42, 65, 0.2);
-    border-color: rgba(244, 42, 65, 0.5);
+    width: 62px;
+    height: 62px;
+    font-size: 1.6rem;
+    background: rgba(244, 42, 65, 0.15);
+    border-color: rgba(244, 42, 65, 0.35);
 }
 
 .touch-btn.large:active,
@@ -643,6 +656,5 @@ body {
 
 /* Specific Positions for Ergonomics */
 .touch-group.right {
-    padding-bottom: 20px;
-    /* Slight lift for thumb arc */
+    padding-bottom: 8px;
 }
