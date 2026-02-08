@@ -121,18 +121,20 @@ class Particle {
     constructor(x, y, type) {
         this.x = x;
         this.y = y;
-        this.type = type; // 'sweat', 'star'
-        this.vx = (Math.random() - 0.5) * 10;
-        this.vy = (Math.random() - 0.5) * 10;
-        this.life = 60;
-        this.size = Math.random() * 5 + 2;
+        this.vx = (Math.random() - 0.5) * (10 * scale);
+        this.vy = (Math.random() - 0.5) * (10 * scale);
+        this.life = 1.0;
+        this.decay = Math.random() * 0.05 + 0.02;
+        this.type = type; // 'dust', 'blood', 'egg', 'star'
+        this.size = (Math.random() * 5 + 2) * scale;
+        this.color = this.getColor(type);
     }
 
     update() {
         this.x += this.vx;
         this.y += this.vy;
         this.vy += 0.2; // Gravity
-        this.life--;
+        this.life -= this.decay;
         return this.life > 0;
     }
 
@@ -251,22 +253,15 @@ ammoOptions.forEach(opt => {
     });
 });
 
-let gameScale = 1;
-let vWidth = 1200; // Virtual width
-let vHeight = 800; // Virtual height
+let scale = 1;
+const BASE_HEIGHT = 600; // Design baseline
 
 function resize() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
-
-    // Scale based on height to fit content vertically
-    // Target height: 768px (standard laptop/tablets)
-    gameScale = Math.min(1, window.innerHeight / 768);
-    // Ensure minimum scale for very small screens
-    gameScale = Math.max(0.5, gameScale);
-
-    vWidth = canvas.width / gameScale;
-    vHeight = canvas.height / gameScale;
+    scale = Math.min(canvas.width / 1000, canvas.height / BASE_HEIGHT);
+    // Prevent scale from becoming too small or too large
+    scale = Math.max(0.6, Math.min(1.5, scale));
 }
 window.addEventListener('resize', resize);
 resize();
@@ -275,11 +270,14 @@ class Fighter {
     constructor(isPlayer, type) {
         this.isPlayer = isPlayer;
         this.type = type; // 'abbas' or 'nasir'
-        this.width = 100;
-        this.height = 200;
-        this.x = isPlayer ? 100 : vWidth - 200;
-        this.y = vHeight - 300;
-        this.maxHealth = 1000; // Extreme HP for endless play
+        this.width = 100 * scale;
+        this.height = 200 * scale;
+        this.x = isPlayer ? 100 * scale : canvas.width - (200 * scale);
+        // Ground is relative to height, e.g. 80% down
+        this.startY = canvas.height * 0.75;
+        this.y = this.startY;
+
+        this.maxHealth = 1000;
         this.health = 1000;
         this.img = type === 'abbas' ? abbasImg : nasirImg;
         this.vy = 0;
@@ -300,7 +298,7 @@ class Fighter {
 
         // Boundaries
         if (this.x < 0) this.x = 0;
-        if (this.x > vWidth - this.width) this.x = vWidth - this.width;
+        if (this.x > canvas.width - this.width) this.x = canvas.width - this.width;
 
         // Torso Lean (Based on hit stun or velocity)
         if (this.hitStun > 0) {
@@ -325,9 +323,10 @@ class Fighter {
 
         // Gravity
         this.y += this.vy;
-        const groundLimit = vHeight - 300;
+        const groundLimit = canvas.height * 0.75; // Matches startY
+
         if (this.y < groundLimit) {
-            this.vy += gravity;
+            this.vy += gravity * scale;
             this.onGround = false;
         } else {
             this.y = groundLimit;
@@ -336,7 +335,7 @@ class Fighter {
 
             // Slide dust
             if (Math.abs(this.vx) > 2) {
-                spawnParticles(this.x + 50, this.y + 190, 'dust', 1);
+                spawnParticles(this.x + (50 * scale), this.y + (190 * scale), 'dust', 1);
             }
         }
 
@@ -404,21 +403,13 @@ class Fighter {
     }
 
     draw() {
-        // 1. Draw Shadow (Absolute coordinates, beneath character)
-        const groundY = vHeight - 100;
-        let shadowWidth = 60 * (1 - (groundY - (this.y + 190)) / 400);
-        let shadowAlpha = 0.3 * (1 - (groundY - (this.y + 190)) / 400);
+        // 1. Draw Shadow
+        const groundY = canvas.height * 0.75 + (200 * scale); // Feet level
+        let shadowWidth = (60 * scale) * (1 - (groundY - (this.y + (190 * scale))) / (400 * scale));
 
         ctx.save();
-        ctx.fillStyle = `rgba(0, 0, 0, ${shadowAlpha})`;
-        ctx.beginPath();
-        ctx.ellipse(this.x + 50, groundY - 5, Math.max(0, shadowWidth), 10, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
-
-        // 2. Main Character Context (Local Space)
-        ctx.save();
-        ctx.translate(this.x + 50, this.y + 150); // Pivot at Hips/Center
+        ctx.translate(this.x + (50 * scale), this.y + (150 * scale)); // Pivot
+        ctx.scale(scale, scale); // APPLY GLOBAL SCALE TO LOCAL CONTEXT
 
         // Body tilt (Knockback/Throw)
         let tilt = this.rotation;
@@ -817,29 +808,48 @@ class Projectile {
     constructor(x, y, vx, vy, type, isPlayer) {
         this.x = x;
         this.y = y;
-        this.vx = vx;
-        this.vy = vy;
+        this.vx = vx * scale; // Scale initial velocity
+        this.vy = vy * scale;
         this.type = type;
         this.isPlayer = isPlayer;
         this.active = true;
-        this.emoji = this.getEmoji();
-    }
-
-    getEmoji() {
-        const emojis = { 'egg': '🥚', 'chappal': '👡', 'mic': '🎤', 'banana': '🍌', 'tomato': '🍅', 'bullet': '🔫' };
-        return emojis[this.type] || '❓';
+        this.width = 30 * scale;
+        this.height = 30 * scale;
+        this.rotation = 0;
+        this.gravity = 0.5 * scale;
+        this.bounceFactor = 0.6;
+        this.friction = 0.99;
+        this.timer = 0; // For Mic/Tomato special effects
     }
 
     update() {
+        if (!this.active) return false;
+
         this.x += this.vx;
         this.y += this.vy;
-
         // Bullet pays no respect to gravity
         if (this.type !== 'bullet') {
-            this.vy += gravity;
+            this.vy += this.gravity;
+        }
+        this.rotation += 0.2;
+
+        const groundLevel = canvas.height * 0.75 + (180 * scale);
+
+        // Ground Bounce
+        if (this.y + this.height > groundLevel) {
+            this.y = groundLevel - this.height;
+            this.vy *= -this.bounceFactor;
+            this.vx *= this.friction;
+
+            if (Math.abs(this.vy) < (1 * scale)) {
+                this.active = false; // Stop rolling
+                // Spawn debris
+                spawnParticles(this.x, this.y, this.type, 5);
+                return false;
+            }
         }
 
-        if (this.y > vHeight - 100 || this.x < -100 || this.x > vWidth + 100) {
+        if (this.y > canvas.height - 100 || this.x < -100 || this.x > canvas.width + 100) {
             this.active = false;
         }
 
@@ -994,10 +1004,10 @@ function gameLoop() {
 
     // Ground (Detailed)
     ctx.fillStyle = '#444'; // Asphalt
-    ctx.fillRect(0, vHeight - 100, vWidth, 100);
+    ctx.fillRect(0, canvas.height - 100, canvas.width, 100);
     // Road line
     ctx.fillStyle = '#666';
-    ctx.fillRect(0, vHeight - 55, vWidth, 10);
+    ctx.fillRect(0, canvas.height - 55, canvas.width, 10);
 
     drawTrajectory();
 
@@ -1025,7 +1035,6 @@ function gameLoop() {
         return active;
     });
 
-    ctx.restore(); // Restore scaling
     animationFrameId = requestAnimationFrame(gameLoop);
 }
 
@@ -1264,8 +1273,8 @@ let mouseX = 0, mouseY = 0;
 canvas.addEventListener('mousemove', (e) => {
     if (!gameActive) return;
     let rect = canvas.getBoundingClientRect();
-    mouseX = (e.clientX - rect.left) / gameScale;
-    mouseY = (e.clientY - rect.top) / gameScale;
+    mouseX = e.clientX - rect.left;
+    mouseY = e.clientY - rect.top;
 });
 
 canvas.addEventListener('mousedown', (e) => {
@@ -1291,8 +1300,8 @@ canvas.addEventListener('touchstart', (e) => {
     if (!gameActive) return;
     e.preventDefault();
     let rect = canvas.getBoundingClientRect();
-    let touchX = (e.touches[0].clientX - rect.left) / gameScale;
-    let touchY = (e.touches[0].clientY - rect.top) / gameScale;
+    let touchX = e.touches[0].clientX - rect.left;
+    let touchY = e.touches[0].clientY - rect.top;
 
     let startX = player.x + 80;
     let startY = player.y + 80;
@@ -1362,7 +1371,7 @@ function drawTrajectory() {
             }
 
             ctx.lineTo(simX, simY);
-            if (simY > vHeight - 100 || simX > vWidth || simX < 0) break;
+            if (simY > canvas.height - 100 || simX > canvas.width || simX < 0) break;
         }
         ctx.stroke();
 
