@@ -176,55 +176,7 @@ let currentAmmo = 'egg';
 let animationFrameId = null;
 let gameTimer = 0;
 
-// Pre-generate buildings for consistent scene
-let buildings = [];
-function generateBuildings() {
-    buildings = [];
-    const count = Math.ceil(canvas.width / 80) + 2;
-    let bx = -40;
-    for (let i = 0; i < count; i++) {
-        const w = 50 + Math.random() * 60;
-        const h = 80 + Math.random() * 180;
-        const color = ['#3a3a5c', '#4a4a6a', '#2d3a4a', '#4a3a3a', '#3a4a3a'][Math.floor(Math.random() * 5)];
-        const windows = Math.floor(Math.random() * 3) + 2;
-        const floors = Math.floor(h / 30);
-        buildings.push({ x: bx, w, h, color, windows, floors });
-        bx += w + 5 + Math.random() * 15;
-    }
-}
 
-function drawBuildings() {
-    if (buildings.length === 0) generateBuildings();
-    const baseY = GROUND_Y;
-    buildings.forEach(b => {
-        // Building body
-        ctx.fillStyle = b.color;
-        ctx.fillRect(b.x, baseY - b.h, b.w, b.h);
-
-        // Building edge highlight
-        ctx.fillStyle = 'rgba(255,255,255,0.05)';
-        ctx.fillRect(b.x, baseY - b.h, 3, b.h);
-
-        // Windows
-        for (let f = 0; f < b.floors; f++) {
-            for (let wn = 0; wn < b.windows; wn++) {
-                let wx = b.x + 8 + wn * (b.w - 16) / b.windows;
-                let wy = baseY - b.h + 12 + f * 28;
-                let lit = Math.random() > 0.4;
-                ctx.fillStyle = lit ? 'rgba(255, 220, 100, 0.7)' : 'rgba(80, 80, 100, 0.5)';
-                ctx.fillRect(wx, wy, 8, 10);
-                if (lit) {
-                    ctx.fillStyle = 'rgba(255, 220, 100, 0.15)';
-                    ctx.fillRect(wx - 2, wy - 2, 12, 14);
-                }
-            }
-        }
-
-        // Roof detail
-        ctx.fillStyle = 'rgba(0,0,0,0.2)';
-        ctx.fillRect(b.x - 2, baseY - b.h - 3, b.w + 4, 6);
-    });
-}
 
 // Assets
 const abbasImg = new Image(); abbasImg.src = '/assets/images/Abbas.png';
@@ -316,7 +268,6 @@ function resize() {
     if (GAME_SCALE < 0.5) GAME_SCALE = 0.5; // Floor scale for tiny screens
 
     GROUND_Y = canvas.height * 0.85;
-    generateBuildings();
 
     // Reposition and rescale fighters on resize
     if (player) {
@@ -1075,7 +1026,6 @@ function startGame() {
     particles = [];
     gameTimer = 0;
     keys = {};
-    generateBuildings();
 
     player = new Fighter(true, selectedCandidate);
     opponent = new Fighter(false, selectedCandidate === 'abbas' ? 'nasir' : 'abbas');
@@ -1133,54 +1083,31 @@ function gameLoop() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     // Dynamic Sky Gradient
-    let skyGrad = ctx.createLinearGradient(0, 0, 0, GROUND_Y);
-    skyGrad.addColorStop(0, '#5b9bd5');
-    skyGrad.addColorStop(0.4, '#87CEEB');
-    skyGrad.addColorStop(0.8, '#b0d8ef');
-    skyGrad.addColorStop(1, '#d4e8c2');
+    let skyGrad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    skyGrad.addColorStop(0, '#87CEEB');
+    skyGrad.addColorStop(1, '#E0F7FA');
     ctx.fillStyle = skyGrad;
-    ctx.fillRect(0, 0, canvas.width, GROUND_Y);
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     // Draw Clouds
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
     clouds.forEach(c => {
         c.x += c.speed;
         if (c.x > canvas.width + 100) c.x = -150;
         ctx.beginPath();
         ctx.arc(c.x, c.y, c.size * 0.5, 0, Math.PI * 2);
-        ctx.arc(c.x + c.size * 0.3, c.y - c.size * 0.15, c.size * 0.4, 0, Math.PI * 2);
-        ctx.arc(c.x - c.size * 0.2, c.y + c.size * 0.1, c.size * 0.35, 0, Math.PI * 2);
-        ctx.arc(c.x + c.size * 0.5, c.y + c.size * 0.1, c.size * 0.3, 0, Math.PI * 2);
+        ctx.arc(c.x + c.size * 0.3, c.y - c.size * 0.2, c.size * 0.4, 0, Math.PI * 2);
+        ctx.arc(c.x + c.size * 0.3, c.y + c.size * 0.2, c.size * 0.4, 0, Math.PI * 2);
         ctx.fill();
     });
 
-    // Background Buildings (Dhaka Silhouette)
-    drawBuildings();
-
-    // Ground (Rich Dhaka Street)
-    let groundGrad = ctx.createLinearGradient(0, GROUND_Y, 0, canvas.height);
-    groundGrad.addColorStop(0, '#555');
-    groundGrad.addColorStop(0.3, '#444');
-    groundGrad.addColorStop(1, '#333');
-    ctx.fillStyle = groundGrad;
+    // Ground
+    ctx.fillStyle = '#444';
     ctx.fillRect(0, GROUND_Y, canvas.width, canvas.height - GROUND_Y);
 
-    // Curb line
+    // Road line
     ctx.fillStyle = '#666';
-    ctx.fillRect(0, GROUND_Y, canvas.width, 4 * GAME_SCALE);
-
-    // Road markings
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
-    let dashW = 40 * GAME_SCALE;
-    let dashGap = 30 * GAME_SCALE;
-    let markingY = GROUND_Y + 35 * GAME_SCALE;
-    for (let mx = (gameTimer * 0.5) % (dashW + dashGap) - dashW; mx < canvas.width; mx += dashW + dashGap) {
-        ctx.fillRect(mx, markingY, dashW, 4 * GAME_SCALE);
-    }
-
-    // Drain/gutter line
-    ctx.fillStyle = '#2a2a2a';
-    ctx.fillRect(0, GROUND_Y + 55 * GAME_SCALE, canvas.width, 3 * GAME_SCALE);
+    ctx.fillRect(0, GROUND_Y + 45 * GAME_SCALE, canvas.width, 10 * GAME_SCALE);
 
     drawTrajectory();
 
