@@ -823,9 +823,9 @@ class Fighter {
 
             if (isGunMode) {
                 // --- GUN AIMING (Hitscan-like) ---
-                // Predict where they will be in ~5 frames (very fast bullet)
-                let predictedX = target.x + (target.vx * 5);
-                let predictedY = target.y + 60;
+                // Predict where they will be in ~3 frames (very fast bullet)
+                let predictedX = target.x + target.width / 2 + (target.vx * 3);
+                let predictedY = target.y + target.height * 0.4;
 
                 let dx = predictedX - startX;
                 let dy = predictedY - startY;
@@ -837,32 +837,38 @@ class Fighter {
             } else {
                 // 1. PREDICTION: Lead the target based on their movement
                 // Improve accuracy as health drops (Enrage mechanic)
-                let accuracy = (this.maxHealth - this.health) / this.maxHealth; // 0.0 to 1.0 (1.0 is mostly accurate)
-                let leadFactor = 30 + (accuracy * 20);
+                let accuracy = (this.maxHealth - this.health) / this.maxHealth; // 0.0 to 1.0
 
-                let predictedX = target.x + (target.vx * leadFactor);
-                let predictedY = target.y + 60; // Aim for chest/head
-
-                let dx = predictedX - startX;
-                let dy = predictedY - startY;
+                let dx = target.x - startX;
+                let dy = (target.y + 60) - startY; // Aim for chest
 
                 // 2. BALLISTICS SOLVER
-                // We want to hit the target in 't' frames.
-                // Short range = low arc (fast), Long range = high arc (lob)
-                // Randomize flight time to keep player guessing (60 - 100 frames)
-                let timeToHit = 60 + Math.random() * 40;
+                // Shorter flight = faster projectile = harder to dodge
+                // Range-adaptive: close = 20 frames, far = 45 frames
+                let dist = Math.abs(dx);
+                let baseTime = 20 + (dist / canvas.width) * 25;
+                let timeToHit = baseTime + Math.random() * 10;
+
+                // Lead prediction: predict where target will be at impact time
+                let leadFactor = timeToHit * (0.6 + accuracy * 0.3);
+                let predictedX = target.x + (target.vx * leadFactor);
+                let predictedY = target.y + 60;
+
+                dx = predictedX - startX;
+                dy = predictedY - startY;
+
+                // Correct gravity: projectile uses gravity * GAME_SCALE per frame
+                let effectiveGravity = gravity * GAME_SCALE;
 
                 // Physics: x = vx * t  =>  vx = dx / t
                 // Physics: y = vy * t + 0.5 * g * t^2  =>  vy = (dy - 0.5*g*t^2) / t
-
                 vx = dx / timeToHit;
-                vy = (dy - (0.5 * gravity * timeToHit * timeToHit)) / timeToHit;
+                vy = (dy - (0.5 * effectiveGravity * timeToHit * timeToHit)) / timeToHit;
 
-                // 3. HUMANIZATION (Add slight error so it's not robotic)
-                // Error decreases as health decreases (AI gets "Serious")
-                let errorMag = Math.max(0.5, (this.health / this.maxHealth) * 3);
+                // 3. HUMANIZATION (slight error, decreases as AI gets hurt)
+                let errorMag = Math.max(0.2, (this.health / this.maxHealth) * 1.2);
                 vx += (Math.random() - 0.5) * errorMag;
-                vy += (Math.random() - 0.5) * errorMag;
+                vy += (Math.random() - 0.5) * errorMag * 0.5;
             }
         }
 
