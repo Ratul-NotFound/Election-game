@@ -299,9 +299,17 @@ class Fighter {
         this.vx = 0;
         this.rotation = 0;
         this.muzzleFlash = 0;
+        this.facing = 1;
     }
 
     update() {
+        const target = this.isPlayer ? opponent : player;
+        if (target) {
+            const thisCenter = this.x + this.width / 2;
+            const targetCenter = target.x + target.width / 2;
+            this.facing = targetCenter >= thisCenter ? 1 : -1;
+        }
+
         // Friction / Knockback dampening
         this.vx *= 0.9;
         this.x += this.vx;
@@ -387,7 +395,11 @@ class Fighter {
 
             // 2. ACTIVE DODGE (Reaction to projectiles)
             if (this.reactionTimer > 5 && this.onGround) { // Faster reaction (5 frames)
-                const threat = projectiles.find(p => p.isPlayer && p.active && Math.abs(p.x - this.x) < 350 && p.vx > 0);
+                const threat = projectiles.find(p => {
+                    if (!p.isPlayer || !p.active) return false;
+                    if (Math.abs(p.x - this.x) > 350) return false;
+                    return (p.vx > 0 && p.x < this.x) || (p.vx < 0 && p.x > this.x);
+                });
                 if (threat) {
                     // 85% chance to dodge (Harder AI)
                     if (Math.random() < 0.85) {
@@ -505,8 +517,9 @@ class Fighter {
         if (isGunMode) {
             let aimAngle = 0;
             if (this.isPlayer) {
-                let dx = mouseX - (this.x + 80);
-                let dy = mouseY - (this.y + 80);
+                const hand = getThrowOrigin(this);
+                let dx = mouseX - hand.x;
+                let dy = mouseY - hand.y;
                 aimAngle = Math.atan2(dy, dx);
             } else {
                 let dx = player.x - this.x;
@@ -515,7 +528,16 @@ class Fighter {
                 if (!this.isPlayer) aimAngle = Math.PI - aimAngle; // AI faces left
             }
             // Clamp angle for arm
-            if (this.isPlayer) aimAngle = Math.max(-0.5, Math.min(0.5, aimAngle));
+            if (this.isPlayer) {
+                if (this.facing === 1) {
+                    aimAngle = Math.max(-0.5, Math.min(0.5, aimAngle));
+                } else {
+                    const minLeft = Math.PI - 0.5;
+                    const maxLeft = Math.PI + 0.5;
+                    if (aimAngle < 0) aimAngle += Math.PI * 2;
+                    aimAngle = Math.max(minLeft, Math.min(maxLeft, aimAngle));
+                }
+            }
             ctx.rotate(aimAngle);
         }
 
@@ -724,8 +746,9 @@ class Fighter {
 
         this.throwingTimer = 15;
 
-        let startX = this.x + (this.isPlayer ? 80 : 20);
-        let startY = this.y + 80;
+        const origin = getThrowOrigin(this);
+        let startX = origin.x;
+        let startY = origin.y;
 
         let vx, vy;
 
@@ -806,8 +829,9 @@ class Fighter {
             let vx = Math.cos(finalAngle) * power;
             let vy = Math.sin(finalAngle) * power;
 
-            let startX = this.x + (this.isPlayer ? this.width * 0.8 : this.width * 0.2);
-            let startY = this.y + this.height * 0.4;
+            const origin = getThrowOrigin(this);
+            let startX = origin.x;
+            let startY = origin.y;
 
             projectiles.push(new Projectile(startX, startY, vx, vy, 'bullet', this.isPlayer));
             playSoundEffect('gun');
@@ -1278,8 +1302,9 @@ let dragY = 0;
 
 function getAimData(inputX, inputY) {
     // Shot origin should be near the character's hand/midsection
-    let startX = player.x + (player.isPlayer ? player.width * 0.7 : player.width * 0.3);
-    let startY = player.y + player.height * 0.4;
+    const origin = getThrowOrigin(player);
+    let startX = origin.x;
+    let startY = origin.y;
 
     let dx = inputX - startX;
     let dy = inputY - startY;
@@ -1292,6 +1317,15 @@ function getAimData(inputX, inputY) {
     power = Math.max(power, 8 * GAME_SCALE);
 
     return { angle, power, startX, startY, dx, dy };
+}
+
+function getThrowOrigin(fighter) {
+    const handOffsetX = fighter.facing === -1 ? fighter.width * 0.2 : fighter.width * 0.8;
+    const handOffsetY = fighter.height * 0.4;
+    return {
+        x: fighter.x + handOffsetX,
+        y: fighter.y + handOffsetY
+    };
 }
 
 // Mouse Aim/Shoot
@@ -1370,12 +1404,6 @@ function drawTrajectory() {
 
         // Only draw if we have a real input (not the default (0,0))
         if (!isDragging && mouseX === 0 && mouseY === 0) {
-            ctx.restore();
-            return;
-        }
-
-        // Hide if aiming backwards
-        if (aim.dx < 0 && player.isPlayer) {
             ctx.restore();
             return;
         }

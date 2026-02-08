@@ -20,12 +20,13 @@ body {
     background: #000;
     color: var(--text);
     overflow: hidden;
-    height: 100vh;
+    height: 100dvh;
+    min-height: 100vh;
 }
 
 #app {
     width: 100%;
-    height: 100%;
+    height: 100dvh;
     position: relative;
 }
 
@@ -292,6 +293,7 @@ body {
     width: 100%;
     height: 100%;
     display: block;
+    touch-action: none;
 }
 
 .hud-layer {
@@ -481,6 +483,56 @@ body {
         justify-content: space-around;
         bottom: 80px;
         /* Make room for controls */
+    }
+}
+
+@media (max-height: 500px) {
+    .hud-layer {
+        top: 8px;
+        left: 12px;
+        right: 12px;
+    }
+
+    .fighter-hud {
+        width: 36vw;
+    }
+
+    .fighter-name {
+        font-size: 0.9rem;
+    }
+
+    .health-bar-container {
+        height: 8px;
+    }
+
+    .ammo-selector {
+        bottom: 70px;
+        gap: 10px;
+        padding: 6px 12px;
+    }
+
+    .ammo-icon {
+        font-size: 1.6rem;
+    }
+
+    .ammo-name {
+        font-size: 0.7rem;
+    }
+
+    .touch-controls {
+        bottom: max(12px, env(safe-area-inset-bottom));
+    }
+
+    .touch-btn {
+        width: 58px;
+        height: 58px;
+        font-size: 1.6rem;
+    }
+
+    .touch-btn.large {
+        width: 70px;
+        height: 70px;
+        font-size: 2rem;
     }
 }
 
