@@ -97,6 +97,20 @@ body {
     /* Firefox */
 }
 
+.credit-footer {
+    margin-top: 1rem;
+    padding-top: 0.6rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    font-size: 0.7rem;
+    color: rgba(255, 255, 255, 0.4);
+    letter-spacing: 0.5px;
+}
+
+.credit-footer strong {
+    color: var(--gold);
+    font-weight: 700;
+}
+
 @keyframes zoomIn {
     from {
         opacity: 0;
