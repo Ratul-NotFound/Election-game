@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>ঢাকা রোস্ট ব্যাটল: ডিম ছোঁড়াছুঁড়ি</title>
     <link rel="stylesheet" href="style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -76,7 +76,10 @@
                     <div class="izzat-text">ইজ্জত মিটার</div>
                 </div>
 
-                <div class="vs-badge">VS</div>
+                <div class="vs-badge">
+                    <div id="game-timer" style="font-size: 0.5em; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,0.8); letter-spacing: 1px;">0:00</div>
+                    <span>VS</span>
+                </div>
 
                 <div class="fighter-hud right">
                     <div class="fighter-name" id="p2-name">Nasir</div>
@@ -135,8 +138,7 @@
                 <h2 class="game-over-title" id="winner-title">বিজয়!</h2>
                 <div id="meme-display" class="meme-area">
                     <!-- Dynamic funny image/text here -->
-                </div>
-                <button id="restart-btn" class="primary-btn-bn">আবার খেলুন</button>
+                </div>                <div id="game-stats-summary" style="margin: 1rem 0; padding: 0.8rem; background: rgba(255,255,255,0.05); border-radius: 12px; font-size: 0.9rem; color: #ccc;"></div>                <button id="restart-btn" class="primary-btn-bn">আবার খেলুন</button>
             </div>
         </div>
     </div>

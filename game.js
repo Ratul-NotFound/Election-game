@@ -174,6 +174,57 @@ let gravity = 0.5;
 let selectedCandidate = 'abbas';
 let currentAmmo = 'egg';
 let animationFrameId = null;
+let gameTimer = 0;
+
+// Pre-generate buildings for consistent scene
+let buildings = [];
+function generateBuildings() {
+    buildings = [];
+    const count = Math.ceil(canvas.width / 80) + 2;
+    let bx = -40;
+    for (let i = 0; i < count; i++) {
+        const w = 50 + Math.random() * 60;
+        const h = 80 + Math.random() * 180;
+        const color = ['#3a3a5c', '#4a4a6a', '#2d3a4a', '#4a3a3a', '#3a4a3a'][Math.floor(Math.random() * 5)];
+        const windows = Math.floor(Math.random() * 3) + 2;
+        const floors = Math.floor(h / 30);
+        buildings.push({ x: bx, w, h, color, windows, floors });
+        bx += w + 5 + Math.random() * 15;
+    }
+}
+
+function drawBuildings() {
+    if (buildings.length === 0) generateBuildings();
+    const baseY = GROUND_Y;
+    buildings.forEach(b => {
+        // Building body
+        ctx.fillStyle = b.color;
+        ctx.fillRect(b.x, baseY - b.h, b.w, b.h);
+
+        // Building edge highlight
+        ctx.fillStyle = 'rgba(255,255,255,0.05)';
+        ctx.fillRect(b.x, baseY - b.h, 3, b.h);
+
+        // Windows
+        for (let f = 0; f < b.floors; f++) {
+            for (let wn = 0; wn < b.windows; wn++) {
+                let wx = b.x + 8 + wn * (b.w - 16) / b.windows;
+                let wy = baseY - b.h + 12 + f * 28;
+                let lit = Math.random() > 0.4;
+                ctx.fillStyle = lit ? 'rgba(255, 220, 100, 0.7)' : 'rgba(80, 80, 100, 0.5)';
+                ctx.fillRect(wx, wy, 8, 10);
+                if (lit) {
+                    ctx.fillStyle = 'rgba(255, 220, 100, 0.15)';
+                    ctx.fillRect(wx - 2, wy - 2, 12, 14);
+                }
+            }
+        }
+
+        // Roof detail
+        ctx.fillStyle = 'rgba(0,0,0,0.2)';
+        ctx.fillRect(b.x - 2, baseY - b.h - 3, b.w + 4, 6);
+    });
+}
 
 // Assets
 const abbasImg = new Image(); abbasImg.src = '/assets/images/Abbas.png';
@@ -266,10 +317,22 @@ function resize() {
 
     GROUND_Y = canvas.height * 0.85;
 
-    // Reset mouse to player center to prevent giant initial line
+    // Reposition and rescale fighters on resize
     if (player) {
+        let pRatioX = player.x / (canvas.width || 1);
+        player.width = player.baseWidth * GAME_SCALE;
+        player.height = player.baseHeight * GAME_SCALE;
+        player.x = Math.max(0, Math.min(pRatioX * canvas.width, canvas.width - player.width));
+        player.y = GROUND_Y - player.height;
         mouseX = player.x + player.width / 2;
         mouseY = player.y + player.height / 2;
+    }
+    if (opponent) {
+        let oRatioX = opponent.x / (canvas.width || 1);
+        opponent.width = opponent.baseWidth * GAME_SCALE;
+        opponent.height = opponent.baseHeight * GAME_SCALE;
+        opponent.x = Math.max(0, Math.min(oRatioX * canvas.width, canvas.width - opponent.width));
+        opponent.y = GROUND_Y - opponent.height;
     }
 }
 window.addEventListener('resize', resize);
@@ -375,50 +438,91 @@ class Fighter {
         if (!this.isPlayer && gameActive) {
             this.cooldown++;
             this.reactionTimer = (this.reactionTimer || 0) + 1;
+            this.jumpCooldown = (this.jumpCooldown || 0);
+            if (this.jumpCooldown > 0) this.jumpCooldown--;
+            this.dodgeCooldown = (this.dodgeCooldown || 0);
+            if (this.dodgeCooldown > 0) this.dodgeCooldown--;
+            this.aiStateTimer = (this.aiStateTimer || 0) + 1;
+            if (!this.aiState) this.aiState = 'pace';
 
-            // 1. MOBILE DEFENSE (Pacing & Gap Maintenance)
-            // Move back and forth to be a hard target
+            // Direction toward and away from player
+            const toPlayerDir = player.x > this.x ? -1 : 1; // away direction
+            const towardPlayer = -toPlayerDir; // toward direction
+            let distToPlayer = Math.abs(this.x - player.x);
+
+            // 1. SMART MOVEMENT (State Machine)
             if (this.onGround) {
-                // Determine ideal distance (keep some range)
-                let distToPlayer = Math.abs(this.x - player.x);
-                let idealDist = 400 + Math.random() * 300; // Varies
+                // Switch AI state periodically
+                if (this.aiStateTimer > 60 + Math.random() * 80) {
+                    this.aiStateTimer = 0;
+                    const rand = Math.random();
+                    if (distToPlayer < 250) this.aiState = 'retreat';
+                    else if (distToPlayer > 700) this.aiState = 'approach';
+                    else if (rand < 0.4) this.aiState = 'pace';
+                    else if (rand < 0.7) this.aiState = 'strafe';
+                    else this.aiState = 'hold';
+                }
 
-                if (distToPlayer < 300) {
-                    this.vx = 3; // Back off!
-                } else if (distToPlayer > 800) {
-                    this.vx = -3; // Get closer
+                if (this.aiState === 'retreat') {
+                    this.vx = toPlayerDir * 3.5; // Back off
+                    if (distToPlayer > 450) this.aiState = 'pace';
+                } else if (this.aiState === 'approach') {
+                    this.vx = towardPlayer * 2.5;
+                    if (distToPlayer < 500) this.aiState = 'pace';
+                } else if (this.aiState === 'pace') {
+                    // Gentle side-to-side pacing
+                    if (Math.random() < 0.03) this.vx = (Math.random() - 0.5) * 4;
+                } else if (this.aiState === 'strafe') {
+                    // Quick lateral movement
+                    if (Math.random() < 0.05) this.vx = (Math.random() > 0.5 ? 1 : -1) * (3 + Math.random() * 2);
                 } else {
-                    // Random pacing
-                    if (Math.random() < 0.02) this.vx = (Math.random() - 0.5) * 6;
+                    // 'hold' — stand still, focus on aiming
+                    this.vx *= 0.8;
                 }
             }
 
-            // 2. ACTIVE DODGE (Reaction to projectiles)
-            if (this.reactionTimer > 5 && this.onGround) { // Faster reaction (5 frames)
+            // 2. SMART DODGE (Mostly sidestep, rare jump)
+            if (this.reactionTimer > 8 && this.dodgeCooldown <= 0) {
                 const threat = projectiles.find(p => {
                     if (!p.isPlayer || !p.active) return false;
-                    if (Math.abs(p.x - this.x) > 350) return false;
+                    let dist = Math.abs(p.x - this.x);
+                    if (dist > 300) return false;
                     return (p.vx > 0 && p.x < this.x) || (p.vx < 0 && p.x > this.x);
                 });
                 if (threat) {
-                    // 85% chance to dodge (Harder AI)
-                    if (Math.random() < 0.85) {
-                        this.vy = -14; // JUMP
-                        this.vx = 5; // BACK
+                    const dodgeRoll = Math.random();
+                    if (dodgeRoll < 0.55) {
+                        // SIDESTEP (most common) — move laterally
+                        this.vx = toPlayerDir * (6 + Math.random() * 3);
+                        this.dodgeCooldown = 25;
+                        if (Math.random() < 0.4) showFloatingText("ধুর!", this.x, this.y - 40);
+                    } else if (dodgeRoll < 0.75) {
+                        // DUCK/CROUCH dodge — just change nothing visually but avoid
+                        this.vx = towardPlayer * 4; // Rush under the projectile
+                        this.dodgeCooldown = 30;
+                    } else if (dodgeRoll < 0.90 && this.onGround && this.jumpCooldown <= 0) {
+                        // JUMP (rare, only if on ground and cooldown is done)
+                        this.vy = -12 * GAME_SCALE;
+                        this.vx = toPlayerDir * 3;
+                        this.jumpCooldown = 90; // Can't jump again for 90 frames (~1.5s)
+                        this.dodgeCooldown = 40;
                         showFloatingText("ধুর!", this.x, this.y - 40);
+                    } else {
+                        // No dodge (miss/fail ~10%)
+                        this.dodgeCooldown = 15;
                     }
                 }
                 this.reactionTimer = 0;
             }
 
-            // 3. EXTREME OFFENSE (Gun Mode / Enraged)
-            // If health < 40% (120 HP), use GUN
+            // 3. OFFENSE (Throw / Gun Mode)
             let isGunMode = this.health < (this.maxHealth * 0.4);
-            let aggressionRate = isGunMode ? 30 : (90 - ((this.maxHealth - this.health) * 0.2)); // Adjusted scaling
+            let aggressionRate = isGunMode ? 35 : (80 - ((this.maxHealth - this.health) / this.maxHealth) * 30);
+            aggressionRate = Math.max(aggressionRate, 25); // Minimum cooldown
 
             if (this.cooldown > aggressionRate) {
                 this.throwProjectile();
-                this.cooldown = -Math.random() * (isGunMode ? 5 : 20); // Almost instant reload in gun mode
+                this.cooldown = -Math.random() * (isGunMode ? 10 : 25);
             }
         }
     }
@@ -742,7 +846,8 @@ class Fighter {
 
         // GUN MODE TRIGGER
         let isGunMode = this.health < (this.maxHealth * 0.4);
-        let ammoType = isGunMode ? 'bullet' : (this.isPlayer ? currentAmmo : (Math.random() > 0.5 ? 'egg' : 'chappal'));
+        const aiAmmoPool = ['egg', 'egg', 'chappal', 'chappal', 'mic', 'banana', 'tomato'];
+        let ammoType = isGunMode ? 'bullet' : (this.isPlayer ? currentAmmo : aiAmmoPool[Math.floor(Math.random() * aiAmmoPool.length)]);
 
         this.throwingTimer = 15;
 
@@ -966,6 +1071,10 @@ function startGame() {
     initAudio(); // Initialize audio on user interaction
     gameActive = true;
     projectiles = [];
+    particles = [];
+    gameTimer = 0;
+    keys = {};
+    generateBuildings();
 
     player = new Fighter(true, selectedCandidate);
     opponent = new Fighter(false, selectedCandidate === 'abbas' ? 'nasir' : 'abbas');
@@ -989,12 +1098,27 @@ function startGame() {
     requestAnimationFrame(gameLoop);
 }
 
+function getHealthColor(percent) {
+    if (percent > 60) return 'linear-gradient(90deg, #00ff00, #88ff00)';
+    if (percent > 35) return 'linear-gradient(90deg, #ffaa00, #ffcc00)';
+    if (percent > 15) return 'linear-gradient(90deg, #ff4400, #ff8800)';
+    return 'linear-gradient(90deg, #cc0000, #ff0000)';
+}
+
 function updateHealthUI() {
     let pHealth = Math.max(0, (player.health / player.maxHealth) * 100);
     let oHealth = Math.max(0, (opponent.health / opponent.maxHealth) * 100);
 
     p1HealthEl.style.width = `${pHealth}%`;
     p2HealthEl.style.width = `${oHealth}%`;
+    p1HealthEl.style.background = getHealthColor(pHealth);
+    p2HealthEl.style.background = getHealthColor(oHealth);
+
+    // Low health warning pulse
+    if (pHealth < 20) p1HealthEl.classList.add('health-critical');
+    else p1HealthEl.classList.remove('health-critical');
+    if (oHealth < 20) p2HealthEl.classList.add('health-critical');
+    else p2HealthEl.classList.remove('health-critical');
 
     if (player.health <= 0 || opponent.health <= 0) {
         endGame(player.health > 0);
@@ -1003,37 +1127,59 @@ function updateHealthUI() {
 
 function gameLoop() {
     if (!gameActive) return;
+    gameTimer++;
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // ... (rest of logic) ...
-
     // Dynamic Sky Gradient
-    let skyGrad = ctx.createLinearGradient(0, 0, 0, canvas.height);
-    skyGrad.addColorStop(0, '#87CEEB'); // Sky Blue
-    skyGrad.addColorStop(1, '#E0F7FA');
+    let skyGrad = ctx.createLinearGradient(0, 0, 0, GROUND_Y);
+    skyGrad.addColorStop(0, '#5b9bd5');
+    skyGrad.addColorStop(0.4, '#87CEEB');
+    skyGrad.addColorStop(0.8, '#b0d8ef');
+    skyGrad.addColorStop(1, '#d4e8c2');
     ctx.fillStyle = skyGrad;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillRect(0, 0, canvas.width, GROUND_Y);
 
     // Draw Clouds
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
     clouds.forEach(c => {
         c.x += c.speed;
         if (c.x > canvas.width + 100) c.x = -150;
-
         ctx.beginPath();
         ctx.arc(c.x, c.y, c.size * 0.5, 0, Math.PI * 2);
-        ctx.arc(c.x + c.size * 0.3, c.y - c.size * 0.2, c.size * 0.4, 0, Math.PI * 2);
-        ctx.arc(c.x + c.size * 0.3, c.y + c.size * 0.2, c.size * 0.4, 0, Math.PI * 2);
+        ctx.arc(c.x + c.size * 0.3, c.y - c.size * 0.15, c.size * 0.4, 0, Math.PI * 2);
+        ctx.arc(c.x - c.size * 0.2, c.y + c.size * 0.1, c.size * 0.35, 0, Math.PI * 2);
+        ctx.arc(c.x + c.size * 0.5, c.y + c.size * 0.1, c.size * 0.3, 0, Math.PI * 2);
         ctx.fill();
     });
 
-    // Ground (Detailed)
-    ctx.fillStyle = '#444'; // Asphalt
+    // Background Buildings (Dhaka Silhouette)
+    drawBuildings();
+
+    // Ground (Rich Dhaka Street)
+    let groundGrad = ctx.createLinearGradient(0, GROUND_Y, 0, canvas.height);
+    groundGrad.addColorStop(0, '#555');
+    groundGrad.addColorStop(0.3, '#444');
+    groundGrad.addColorStop(1, '#333');
+    ctx.fillStyle = groundGrad;
     ctx.fillRect(0, GROUND_Y, canvas.width, canvas.height - GROUND_Y);
-    // Road line
+
+    // Curb line
     ctx.fillStyle = '#666';
-    ctx.fillRect(0, GROUND_Y + 45 * GAME_SCALE, canvas.width, 10 * GAME_SCALE);
+    ctx.fillRect(0, GROUND_Y, canvas.width, 4 * GAME_SCALE);
+
+    // Road markings
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+    let dashW = 40 * GAME_SCALE;
+    let dashGap = 30 * GAME_SCALE;
+    let markingY = GROUND_Y + 35 * GAME_SCALE;
+    for (let mx = (gameTimer * 0.5) % (dashW + dashGap) - dashW; mx < canvas.width; mx += dashW + dashGap) {
+        ctx.fillRect(mx, markingY, dashW, 4 * GAME_SCALE);
+    }
+
+    // Drain/gutter line
+    ctx.fillStyle = '#2a2a2a';
+    ctx.fillRect(0, GROUND_Y + 55 * GAME_SCALE, canvas.width, 3 * GAME_SCALE);
 
     drawTrajectory();
 
@@ -1060,6 +1206,15 @@ function gameLoop() {
         p.draw();
         return active;
     });
+
+    // Update Timer Display
+    const timerEl = document.getElementById('game-timer');
+    if (timerEl) {
+        const totalSec = Math.floor(gameTimer / 60);
+        const mins = Math.floor(totalSec / 60);
+        const secs = totalSec % 60;
+        timerEl.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+    }
 
     animationFrameId = requestAnimationFrame(gameLoop);
 }
@@ -1246,16 +1401,33 @@ function endGame(playerWon) {
 
     const title = document.getElementById('winner-title');
     const meme = document.getElementById('meme-display');
+    const statsSummary = document.getElementById('game-stats-summary');
+
+    const totalSec = Math.floor(gameTimer / 60);
+    const mins = Math.floor(totalSec / 60);
+    const secs = totalSec % 60;
+    const pHealthLeft = Math.max(0, Math.round((player.health / player.maxHealth) * 100));
+    const oHealthLeft = Math.max(0, Math.round((opponent.health / opponent.maxHealth) * 100));
 
     if (playerWon) {
         title.innerText = "বিজয় আপনার!";
-        meme.innerHTML = `<h1 style="color:green">খেলা শেষ! আপনি জিতছেন!</h1>`;
+        meme.innerHTML = `<h1 style="color:#00ff88; font-size: clamp(1.5rem, 4vh, 2.5rem)">${title.innerText} 🏆</h1>`;
         StatsManager.recordResult(selectedCandidate === 'abbas' ? 'Abbas' : 'Nasir');
     } else {
         title.innerText = "হেরে গেলেন!";
-        meme.innerHTML = `<h1 style="color:red">ইজ্জত পাংচার!</h1>`;
+        meme.innerHTML = `<h1 style="color:#ff4444; font-size: clamp(1.5rem, 4vh, 2.5rem)">${title.innerText} 💥</h1>`;
         if (failSound) failSound.play().catch(() => { });
         StatsManager.recordResult(selectedCandidate === 'abbas' ? 'Nasir' : 'Abbas');
+    }
+
+    if (statsSummary) {
+        statsSummary.innerHTML = `
+            <div style="display:flex; justify-content:space-around; gap:10px; flex-wrap:wrap; font-size: clamp(0.7rem, 1.5vh, 1rem);">
+                <div>⏱️ <strong>${mins}:${secs.toString().padStart(2, '0')}</strong></div>
+                <div>💚 <strong style="color:${pHealthLeft > 30 ? '#0f0' : '#f44'}">${pHealthLeft}%</strong></div>
+                <div>💔 <strong style="color:${oHealthLeft > 30 ? '#0f0' : '#f44'}">${oHealthLeft}%</strong></div>
+            </div>
+        `;
     }
 
     if (bgMusic) {
@@ -1443,7 +1615,15 @@ function drawTrajectory() {
 }
 
 window.addEventListener('keydown', (e) => {
+    keys[e.key] = true;
+    if (e.key === ' ' && player && player.onGround && gameActive) {
+        player.vy = -12 * GAME_SCALE;
+    }
     if (e.code === 'Space') triggerRoast();
+});
+
+window.addEventListener('keyup', (e) => {
+    keys[e.key] = false;
 });
 
 

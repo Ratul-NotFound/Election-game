@@ -72,14 +72,15 @@ body {
 .glass-panel {
     background: rgba(0, 0, 0, 0.85);
     backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
     border: 1px solid var(--glass-border);
     border-radius: 20px;
-    padding: clamp(1rem, 2vh, 2rem);
+    padding: clamp(0.8rem, 2vh, 2rem) clamp(1rem, 3vw, 2.5rem);
     text-align: center;
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.9);
     max-width: 600px;
     width: 95%;
-    max-height: 95vh;
+    max-height: 95dvh;
     overflow-y: auto;
     animation: zoomIn 0.5s ease;
     z-index: 10;
@@ -298,17 +299,20 @@ body {
 
 .hud-layer {
     position: absolute;
-    top: 20px;
-    left: 20px;
-    right: 20px;
+    top: 12px;
+    left: 16px;
+    right: 16px;
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
     z-index: 100;
+    pointer-events: none;
 }
 
 .fighter-hud {
-    width: 32vw;
+    width: 30vw;
+    max-width: 280px;
+    min-width: 120px;
 }
 
 .fighter-name {
@@ -321,17 +325,26 @@ body {
 
 .health-bar-container {
     width: 100%;
-    height: 10px;
-    background: rgba(0, 0, 0, 0.5);
-    border: 1.5px solid white;
+    height: clamp(8px, 1.5vh, 14px);
+    background: rgba(0, 0, 0, 0.6);
+    border: 1.5px solid rgba(255, 255, 255, 0.7);
     border-radius: 5px;
     overflow: hidden;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.4);
 }
 
 .health-bar {
     height: 100%;
-    background: linear-gradient(90deg, #00ff00, #ffff00);
-    transition: width 0.3s ease-out;
+    transition: width 0.3s ease-out, background 0.5s ease;
+}
+
+.health-bar.health-critical {
+    animation: healthPulse 0.6s ease-in-out infinite;
+}
+
+@keyframes healthPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
 }
 
 .izzat-text {
@@ -346,28 +359,31 @@ body {
     position: absolute;
     left: 50%;
     transform: translateX(-50%);
-    font-size: 3rem;
+    font-size: clamp(1.2rem, 4vh, 2.5rem);
     font-weight: 900;
     color: var(--secondary);
-    text-shadow: 0 0 10px red;
-    top: 10px;
+    text-shadow: 0 0 10px rgba(244, 42, 65, 0.6), 0 2px 4px rgba(0,0,0,0.5);
+    top: 6px;
+    letter-spacing: 2px;
 }
 
 /* Ammo Selector */
 .ammo-selector {
     position: absolute;
     bottom: 12vh;
-    /* Moved up to clear controls */
     left: 50%;
     transform: translateX(-50%);
     display: flex;
-    gap: 15px;
-    background: rgba(0, 0, 0, 0.4);
-    backdrop-filter: blur(5px);
-    padding: 8px 15px;
+    gap: clamp(8px, 1.5vw, 15px);
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    padding: clamp(6px, 1vh, 10px) clamp(10px, 2vw, 18px);
     border-radius: 30px;
     z-index: 1000;
-    border: 1px solid var(--glass-border);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    max-width: 95vw;
 }
 
 .ammo-option {
@@ -375,28 +391,55 @@ body {
     flex-direction: column;
     align-items: center;
     cursor: pointer;
-    opacity: 0.5;
-    transition: 0.2s;
+    opacity: 0.4;
+    transition: all 0.2s ease;
+    padding: 4px 6px;
+    border-radius: 12px;
 }
 
-.ammo-option.active,
-.ammo-option:hover {
+.ammo-option.active {
     opacity: 1;
-    transform: scale(1.1);
+    transform: scale(1.15);
+    background: rgba(255, 204, 0, 0.2);
+    box-shadow: 0 0 10px rgba(255, 204, 0, 0.3);
+}
+
+.ammo-option:hover {
+    opacity: 0.8;
+    transform: scale(1.05);
 }
 
 .ammo-icon {
-    font-size: 2rem;
+    font-size: clamp(1.4rem, 3vh, 2.2rem);
 }
 
 .ammo-name {
-    font-size: 0.8rem;
+    font-size: clamp(0.55rem, 1vh, 0.8rem);
     font-weight: bold;
+    margin-top: 2px;
 }
 
 /* Animations */
 .shake {
     animation: shake 0.5s;
+}
+
+.shake-hard {
+    animation: shakeHard 0.5s;
+}
+
+@keyframes shakeHard {
+    0% { transform: translate(3px, 3px) rotate(0deg); }
+    10% { transform: translate(-4px, -3px) rotate(-2deg); }
+    20% { transform: translate(-6px, 0px) rotate(2deg); }
+    30% { transform: translate(6px, 4px) rotate(0deg); }
+    40% { transform: translate(3px, -3px) rotate(2deg); }
+    50% { transform: translate(-4px, 4px) rotate(-2deg); }
+    60% { transform: translate(-6px, 2px) rotate(0deg); }
+    70% { transform: translate(6px, 2px) rotate(-2deg); }
+    80% { transform: translate(-3px, -3px) rotate(2deg); }
+    90% { transform: translate(3px, 4px) rotate(0deg); }
+    100% { transform: translate(2px, -3px) rotate(-1deg); }
 }
 
 @keyframes shake {
@@ -488,51 +531,52 @@ body {
 
 @media (max-height: 500px) {
     .hud-layer {
-        top: 8px;
-        left: 12px;
-        right: 12px;
+        top: 6px;
+        left: 10px;
+        right: 10px;
     }
 
     .fighter-hud {
-        width: 36vw;
+        width: 30vw;
     }
 
     .fighter-name {
-        font-size: 0.9rem;
+        font-size: 0.8rem;
     }
 
     .health-bar-container {
-        height: 8px;
+        height: 6px;
+    }
+
+    .vs-badge {
+        font-size: 1.2rem;
+        top: 4px;
     }
 
     .ammo-selector {
-        bottom: 70px;
-        gap: 10px;
-        padding: 6px 12px;
-    }
-
-    .ammo-icon {
-        font-size: 1.6rem;
-    }
-
-    .ammo-name {
-        font-size: 0.7rem;
+        bottom: 60px;
+        gap: 6px;
+        padding: 4px 10px;
     }
 
     .touch-controls {
-        bottom: max(12px, env(safe-area-inset-bottom));
+        bottom: max(8px, env(safe-area-inset-bottom));
     }
 
     .touch-btn {
-        width: 58px;
-        height: 58px;
-        font-size: 1.6rem;
+        width: 50px;
+        height: 50px;
+        font-size: 1.3rem;
     }
 
     .touch-btn.large {
-        width: 70px;
-        height: 70px;
-        font-size: 2rem;
+        width: 60px;
+        height: 60px;
+        font-size: 1.6rem;
+    }
+
+    .touch-group {
+        gap: 10vw;
     }
 }
 
@@ -550,8 +594,7 @@ body {
 
 .touch-group {
     display: flex;
-    gap: 15vw;
-    /* Wider gap for thumbs */
+    gap: clamp(15px, 12vw, 80px);
     pointer-events: auto;
     align-items: flex-end;
 }
