@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="bn">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ঢাকা রোস্ট ব্যাটল: ডিম ছোঁড়াছুঁড়ি</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;700&family=Outfit:wght@900&display=swap"
+        rel="stylesheet">
+</head>
+
+<body>
+    <div id="rotate-warning">
+        <div class="rotate-icon">📱↻</div>
+        <p>Please Rotate Your Device</p>
+        <p class="bn" style="font-size: 1.5rem;">গেমটি খেলতে ফোন ঘুরান</p>
+    </div>
+    <div id="app">
+        <!-- Landing Screen -->
+        <div id="landing-screen" class="screen visible">
+            <div class="bg-watermark">ঢাকা-৮</div>
+            <div class="glass-panel">
+                <h1 class="title-bn">ঢাকা রোস্ট ব্যাটল</h1>
+                <p class="subtitle-bn">ডিম, চপ্পল আর মাইক দিয়ে খেলা হবে!</p>
+
+                <div class="selection-container">
+                    <p class="select-label">আপনার ফাইটার বেছে নিন:</p>
+                    <div class="candidates-row">
+                        <div class="char-card active" data-candidate="abbas">
+                            <img src="assets/images/Abbas.png" alt="Abbas">
+                            <span>মির্জা আব্বাস</span>
+                        </div>
+                        <div class="char-card" data-candidate="nasir">
+                            <img src="assets/images/Nasir.png" alt="Nasir">
+                            <span>নাসির পাটোয়ারী</span>
+                        </div>
+                    </div>
+                </div>
+
+                <button id="start-btn" class="primary-btn-bn">ব্যাটল শুরু করুন</button>
+                <div class="controls-hint">
+                    <p>মাউস দিয়ে লক্ষ ঠিক করুন এবং ক্লিক করে ছুঁড়ে মারুন!</p>
+                </div>
+
+                <!-- Live Stats Ticker -->
+                <div class="stats-container">
+                    <div class="stat-item">
+                        <span class="stat-label">Total Matches</span>
+                        <span class="stat-value" id="stat-total">Loading...</span>
+                    </div>
+                    <div class="stat-divider"></div>
+                    <div class="stat-item">
+                        <span class="stat-label">Abbas Wins</span>
+                        <span class="stat-value" id="stat-abbas">--</span>
+                    </div>
+                    <div class="stat-divider"></div>
+                    <div class="stat-item">
+                        <span class="stat-label">Nasir Wins</span>
+                        <span class="stat-value" id="stat-nasir">--</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="game-screen" class="hidden">
+            <!-- HUD -->
+            <div class="hud-layer">
+                <div class="fighter-hud left">
+                    <div class="fighter-name" id="p1-name">Abbas</div>
+                    <div class="health-bar-container">
+                        <div class="health-bar" id="p1-health" style="width: 100%;"></div>
+                    </div>
+                    <div class="izzat-text">ইজ্জত মিটার</div>
+                </div>
+
+                <div class="vs-badge">VS</div>
+
+                <div class="fighter-hud right">
+                    <div class="fighter-name" id="p2-name">Nasir</div>
+                    <div class="health-bar-container">
+                        <div class="health-bar" id="p2-health" style="width: 100%;"></div>
+                    </div>
+                    <div class="izzat-text">ইজ্জত মিটার</div>
+                </div>
+            </div>
+
+            <!-- Touch Controls Overlay -->
+            <div class="touch-controls">
+                <!-- Left Side: Movement -->
+                <div class="touch-group left">
+                    <div class="touch-btn" id="btn-left">⬅️</div>
+                    <div class="touch-btn" id="btn-right">➡️</div>
+                </div>
+
+                <!-- Right Side: Actions -->
+                <div class="touch-group right">
+                    <div class="touch-btn" id="btn-dash">💨</div>
+                    <div class="touch-btn large" id="btn-jump">⬆️</div>
+                </div>
+            </div>
+
+            <canvas id="game-canvas"></canvas>
+
+            <!-- Ammo Selector -->
+            <div class="ammo-selector">
+                <div class="ammo-option active" data-ammo="egg">
+                    <span class="ammo-icon">🥚</span>
+                    <span class="ammo-name">পচা ডিম</span>
+                </div>
+                <div class="ammo-option" data-ammo="chappal">
+                    <span class="ammo-icon">👡</span>
+                    <span class="ammo-name">চপ্পল</span>
+                </div>
+                <div class="ammo-option" data-ammo="mic">
+                    <span class="ammo-icon">🎤</span>
+                    <span class="ammo-name">মাইক</span>
+                </div>
+                <div class="ammo-option" data-ammo="banana">
+                    <span class="ammo-icon">🍌</span>
+                    <span class="ammo-name">কলা</span>
+                </div>
+                <div class="ammo-option" data-ammo="tomato">
+                    <span class="ammo-icon">🍅</span>
+                    <span class="ammo-name">টমেটো</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Game Over Screen -->
+        <div id="game-over-screen" class="screen">
+            <div class="glass-panel">
+                <h2 class="game-over-title" id="winner-title">বিজয়!</h2>
+                <div id="meme-display" class="meme-area">
+                    <!-- Dynamic funny image/text here -->
+                </div>
+                <button id="restart-btn" class="primary-btn-bn">আবার খেলুন</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Audio Elements -->
+    <audio id="bg-music" loop src="assets/audio/sound.mp3"></audio>
+    <audio id="hit-sound" src="assets/audio/catch.mp3"></audio> <!-- Reusing catch as hit for now -->
+    <audio id="fail-sound" src="assets/audio/fail.mp3"></audio>
+
+    <!-- Game Logic -->
+    <script type="module" src="game.js"></script>
+</body>
+
+</html>

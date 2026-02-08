@@ -1,0 +1,17 @@
+{
+    "rules": {
+        "stats": {
+            ".read": true,
+            ".write": true,
+            "totalGames": {
+                ".validate": "newData.isNumber()"
+            },
+            "abbasWins": {
+                ".validate": "newData.isNumber()"
+            },
+            "nasirWins": {
+                ".validate": "newData.isNumber()"
+            }
+        }
+    }
+}
