@@ -1284,6 +1284,9 @@ function getAimData(inputX, inputY) {
     let dx = inputX - startX;
     let dy = inputY - startY;
 
+    let angle = Math.atan2(dy, dx);
+    let dist = Math.sqrt(dx * dx + dy * dy);
+
     // Increase power sensitivity slightly for mobile
     let power = Math.min(dist * 0.15, 45 * GAME_SCALE);
     power = Math.max(power, 8 * GAME_SCALE);
