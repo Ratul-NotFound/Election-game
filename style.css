@@ -476,7 +476,8 @@ body {
 
 .touch-group {
     display: flex;
-    gap: 20px;
+    gap: 15vw;
+    /* Wider gap for thumbs */
     pointer-events: auto;
     align-items: flex-end;
 }

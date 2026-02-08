@@ -1266,8 +1266,29 @@ function showFloatingText(text, x, y, isCrit = false) {
 // Controls (Point & Click)
 let mouseX = 0, mouseY = 0;
 
+let isDragging = false;
+let dragX = 0;
+let dragY = 0;
+
+function getAimData(inputX, inputY) {
+    let startX = player.x + player.width * 0.8;
+    let startY = player.y + player.height * 0.4;
+
+    let dx = inputX - startX;
+    let dy = inputY - startY;
+
+    let angle = Math.atan2(dy, dx);
+    let dist = Math.sqrt(dx * dx + dy * dy);
+
+    // Scale power based on screen size but keep it consistent for gameplay
+    let power = Math.min(dist * 0.1, 40 * GAME_SCALE);
+    power = Math.max(power, 10 * GAME_SCALE);
+
+    return { angle, power, startX, startY };
+}
+
+// Mouse Aim/Shoot
 canvas.addEventListener('mousemove', (e) => {
-    if (!gameActive) return;
     let rect = canvas.getBoundingClientRect();
     mouseX = e.clientX - rect.left;
     mouseY = e.clientY - rect.top;
@@ -1275,74 +1296,69 @@ canvas.addEventListener('mousemove', (e) => {
 
 canvas.addEventListener('mousedown', (e) => {
     if (!gameActive) return;
-
-    let startX = player.x + 80;
-    let startY = player.y + 80;
-
-    let dx = mouseX - startX;
-    let dy = mouseY - startY;
-
-    let angle = Math.atan2(dy, dx);
-    let dist = Math.sqrt(dx * dx + dy * dy);
-    let power = Math.min(dist * 0.08, 35);
-    power = Math.max(power, 10);
-
-    // Click to throw/shoot
-    player.throwProjectile(angle, power);
+    const aim = getAimData(mouseX, mouseY);
+    player.throwProjectile(aim.angle, aim.power);
 });
 
-// Touch (Tap to throw)
+// Mobile Drag-to-Aim
 canvas.addEventListener('touchstart', (e) => {
     if (!gameActive) return;
     e.preventDefault();
+    isDragging = true;
     let rect = canvas.getBoundingClientRect();
-    let touchX = e.touches[0].clientX - rect.left;
-    let touchY = e.touches[0].clientY - rect.top;
+    let touch = e.touches[0];
+    dragX = touch.clientX - rect.left;
+    dragY = touch.clientY - rect.top;
 
-    let startX = player.x + 80;
-    let startY = player.y + 80;
+    // Update global mouseX/mouseY for trajectory drawing
+    mouseX = dragX;
+    mouseY = dragY;
+}, { passive: false });
 
-    let dx = touchX - startX;
-    let dy = touchY - startY;
+canvas.addEventListener('touchmove', (e) => {
+    if (!gameActive || !isDragging) return;
+    e.preventDefault();
+    let rect = canvas.getBoundingClientRect();
+    let touch = e.touches[0];
+    dragX = touch.clientX - rect.left;
+    dragY = touch.clientY - rect.top;
 
-    let angle = Math.atan2(dy, dx);
-    let dist = Math.sqrt(dx * dx + dy * dy);
-    let power = Math.min(dist * 0.08, 35);
+    mouseX = dragX;
+    mouseY = dragY;
+}, { passive: false });
 
-    // Tap to throw/shoot
-    player.throwProjectile(angle, power);
-});
+canvas.addEventListener('touchend', (e) => {
+    if (!gameActive || !isDragging) return;
+    e.preventDefault();
+    isDragging = false;
+
+    const aim = getAimData(dragX, dragY);
+    player.throwProjectile(aim.angle, aim.power);
+}, { passive: false });
 
 function drawTrajectory() {
     if (gameActive) {
         let isGunMode = player.health < (player.maxHealth * 0.4);
+        const aim = getAimData(mouseX, mouseY);
 
         ctx.save();
-        ctx.strokeStyle = isGunMode ? '#ff0000' : '#00ffff'; // Red for danger/gun
-        ctx.lineWidth = 3;
-        if (isGunMode) ctx.setLineDash([]); // Solid line for laser/gun
-        else ctx.setLineDash([5, 5]);
+        ctx.strokeStyle = isGunMode ? '#ff0000' : '#00ffff';
+        ctx.lineWidth = 4 * GAME_SCALE;
+        if (isGunMode) ctx.setLineDash([]);
+        else ctx.setLineDash([8 * GAME_SCALE, 8 * GAME_SCALE]);
 
-        let startX = player.x + (player.isPlayer ? 80 : 20);
-        let startY = player.y + 80;
-
-        let dx = mouseX - startX;
-        let dy = mouseY - startY;
-
-        let angle = Math.atan2(dy, dx);
-        let dist = Math.sqrt(dx * dx + dy * dy);
-        let power = Math.min(dist * 0.08, 35);
-        power = Math.max(power, 10);
+        let startX = aim.startX;
+        let startY = aim.startY;
 
         let vx, vy;
 
         if (isGunMode) {
             // Straight line trajectory
-            vx = Math.cos(angle) * 30;
-            vy = Math.sin(angle) * 30;
+            vx = Math.cos(aim.angle) * 30 * GAME_SCALE;
+            vy = Math.sin(aim.angle) * 30 * GAME_SCALE;
         } else {
-            vx = Math.cos(angle) * power;
-            vy = Math.sin(angle) * power;
+            vx = Math.cos(aim.angle) * aim.power;
+            vy = Math.sin(aim.angle) * aim.power;
         }
 
         // Hide if aiming backwards
