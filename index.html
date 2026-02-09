@@ -65,6 +65,10 @@
 
                 <div class="credit-footer">
                     <span>Made with ❤️ by <strong>Ratul</strong></span>
+                    <div class="credit-links">
+                        <a href="https://www.linkedin.com/in/mahmud-hasan-ratul-0831b9257" target="_blank" rel="noopener">🔗 LinkedIn</a>
+                        <a href="https://www.facebook.com/mahmud.hasan.ratul.76669" target="_blank" rel="noopener">📘 Facebook</a>
+                    </div>
                 </div>
             </div>
         </div>
@@ -83,6 +87,7 @@
                 <div class="vs-badge">
                     <div id="game-timer" style="font-size: 0.5em; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,0.8); letter-spacing: 1px;">0:00</div>
                     <span>VS</span>
+                    <div id="score-display" style="font-size: 0.4em; color: #ffcc00; text-shadow: 0 1px 3px rgba(0,0,0,0.8);">🎯 0</div>
                 </div>
 
                 <div class="fighter-hud right">
@@ -110,6 +115,13 @@
             </div>
 
             <canvas id="game-canvas"></canvas>
+
+            <!-- Game Control Buttons (separate from HUD to avoid pointer-events issues) -->
+            <div class="game-controls-top">
+                <button id="btn-back" class="game-ctrl-btn" title="ফিরে যান">🔙</button>
+                <button id="btn-pause" class="game-ctrl-btn" title="পজ/প্লে">⏸️</button>
+                <button id="btn-music" class="game-ctrl-btn" title="মিউজিক">🔊</button>
+            </div>
 
             <!-- Ammo Selector -->
             <div class="ammo-selector">
@@ -145,6 +157,10 @@
                 </div>                <div id="game-stats-summary" style="margin: 1rem 0; padding: 0.8rem; background: rgba(255,255,255,0.05); border-radius: 12px; font-size: 0.9rem; color: #ccc;"></div>                <button id="restart-btn" class="primary-btn-bn">আবার খেলুন</button>
                 <div class="credit-footer">
                     <span>Made with ❤️ by <strong>Ratul</strong></span>
+                    <div class="credit-links">
+                        <a href="https://www.linkedin.com/in/mahmud-hasan-ratul-0831b9257" target="_blank" rel="noopener">🔗 LinkedIn</a>
+                        <a href="https://www.facebook.com/mahmud.hasan.ratul.76669" target="_blank" rel="noopener">📘 Facebook</a>
+                    </div>
                 </div>
             </div>
         </div>

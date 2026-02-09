@@ -1,4 +1,4 @@
-const canvas = document.getElementById('game-canvas');
+﻿const canvas = document.getElementById('game-canvas');
 const ctx = canvas.getContext('2d');
 const p1HealthEl = document.getElementById('p1-health');
 const p2HealthEl = document.getElementById('p2-health');
@@ -106,6 +106,7 @@ let projectiles = [];
 let particles = [];
 let clouds = [];
 let keys = {}; // Track pressed keys
+let activeFloatingTexts = []; // Track floating damage texts
 
 // Initialize clouds
 for (let i = 0; i < 5; i++) {
@@ -315,6 +316,12 @@ class Fighter {
         this.rotation = 0;
         this.muzzleFlash = 0;
         this.facing = 1;
+        this.comboCount = 0;
+        this.comboTimer = 0;
+        this.totalHits = 0;
+        this.totalDodges = 0;
+        this.maxCombo = 0;
+        this.score = 0;
     }
 
     update() {
@@ -347,6 +354,10 @@ class Fighter {
 
         if (this.throwingTimer > 0) this.throwingTimer--;
         if (this.muzzleFlash > 0) this.muzzleFlash--;
+        if (this.comboTimer > 0) {
+            this.comboTimer--;
+            if (this.comboTimer <= 0) this.comboCount = 0;
+        }
 
         // Update hit marks
         this.hitMarks = this.hitMarks.filter(mark => {
@@ -442,6 +453,7 @@ class Fighter {
                     return (p.vx > 0 && p.x < this.x) || (p.vx < 0 && p.x > this.x);
                 });
                 if (threat) {
+                    this.totalDodges++;
                     const dodgeRoll = Math.random();
                     if (dodgeRoll < 0.55) {
                         // SIDESTEP (most common) — move laterally
@@ -545,6 +557,21 @@ class Fighter {
             ctx.fillStyle = '#fff';
             ctx.beginPath(); ctx.arc(0, -66 + (i * 14), 2.5, 0, Math.PI * 2); ctx.fill();
         }
+
+        // Pocket detail
+        ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(8, -55, 12, 15);
+        ctx.strokeRect(-20, -55, 12, 15);
+
+        // Belt
+        ctx.fillStyle = '#2a2a2a';
+        ctx.fillRect(-22, -4, 44, 6);
+        // Belt buckle
+        ctx.fillStyle = '#c0a030';
+        ctx.fillRect(-4, -5, 8, 8);
+        ctx.fillStyle = '#a08020';
+        ctx.fillRect(-2, -3, 4, 4);
 
         // --- ARMS ---
         let armGrad = ctx.createLinearGradient(-10, 0, 10, 0);
@@ -789,8 +816,6 @@ class Fighter {
             }
             ctx.restore();
         });
-
-        ctx.restore();
     }
 
     throwProjectile(angle = null, power = null) {
@@ -872,7 +897,7 @@ class Fighter {
             }
         }
 
-        if (this.isPlayer) playSoundEffect(isGunMode ? 'gun' : 'throw');
+        playSoundEffect(isGunMode ? 'gun' : 'throw');
         projectiles.push(new Projectile(startX, startY, vx, vy, ammoType, this.isPlayer));
     }
 
@@ -999,20 +1024,36 @@ function checkHit(proj, target) {
         spawnParticles(target.x + 50, target.y + 20, 'sweat', 8);
         if (isCrit) spawnParticles(target.x + 50, target.y - 10, 'star', 5);
 
+        // Track combos for the attacker
+        let attacker = proj.isPlayer ? player : opponent;
+        attacker.comboCount++;
+        attacker.comboTimer = 90; // 1.5 sec to keep combo alive
+        attacker.totalHits++;
+        if (attacker.comboCount > attacker.maxCombo) attacker.maxCombo = attacker.comboCount;
+
+        // Combo damage bonus
+        if (attacker.comboCount >= 3) damage = Math.ceil(damage * (1 + attacker.comboCount * 0.1));
+
         if (isCrit) {
             damage *= 2;
             target.hitStun = 45; // Longer stun
-            showFloatingText("CRITICAL!", target.x + 50, target.y - 20, true);
+            showFloatingText("CRITICAL! 💥", target.x + 50, target.y - 20, true);
         } else {
             target.hitStun = 10; // Short stun
-            const reaction = funnyReactions[Math.floor(Math.random() * funnyReactions.length)];
-            showFloatingText(reaction, target.x + 50, target.y + 20);
         }
+
+        // Show combo text
+        if (attacker.comboCount >= 2) {
+            showFloatingText(`${attacker.comboCount}x COMBO!`, attacker.x + 50, attacker.y - 60, attacker.comboCount >= 4);
+        }
+
+        // Score tracking
+        attacker.score += damage * (isCrit ? 3 : 1) + attacker.comboCount * 5;
 
         target.health -= damage;
         showFloatingText(`-${damage}`, target.x + 50, target.y + 50, isCrit);
 
-        playSoundEffect('hit', proj.type);
+        playSoundEffect('hit', proj.type, target);
 
         // Screen Shake
         let shakeStrength = isCrit ? 'shake-hard' : 'shake';
@@ -1047,9 +1088,11 @@ function startGame() {
 
     if (bgMusic) {
         bgMusic.currentTime = 0;
-        bgMusic.volume = 0.4; // Recalibrated for better balance with boosted hits
-        bgMusic.play().catch(() => { });
+        bgMusic.volume = 0.4;
+        if (!musicMuted) bgMusic.play().catch(() => { });
     }
+    gamePaused = false;
+    if (btnPause) btnPause.textContent = '⏸️';
 
     if (animationFrameId) cancelAnimationFrame(animationFrameId);
     requestAnimationFrame(gameLoop);
@@ -1084,8 +1127,10 @@ function updateHealthUI() {
 
 function gameLoop() {
     if (!gameActive) return;
+    if (gamePaused) return; // Don't update while paused
     gameTimer++;
 
+  try {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     // Dynamic Sky Gradient
@@ -1141,15 +1186,24 @@ function gameLoop() {
         return active;
     });
 
-    // Update Timer Display
+    // Update Timer & Score Display
     const timerEl = document.getElementById('game-timer');
+    const scoreEl = document.getElementById('score-display');
     if (timerEl) {
         const totalSec = Math.floor(gameTimer / 60);
         const mins = Math.floor(totalSec / 60);
         const secs = totalSec % 60;
         timerEl.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
     }
+    if (scoreEl && player) {
+        let txt = `🎯 ${player.score}`;
+        if (player.comboCount >= 2) txt += ` 🔥${player.comboCount}x`;
+        scoreEl.textContent = txt;
+    }
 
+  } catch (err) {
+    console.error('Game loop error:', err);
+  }
     animationFrameId = requestAnimationFrame(gameLoop);
 }
 
@@ -1159,6 +1213,10 @@ const chappalSounds = ["ফটাস!", "থাপ্পড়!", "ধাপ্প�
 const micSounds = ["ঠক!", "টুং!", "পিউউ!", "ঠাস!"];
 const bananaSounds = ["পিচ্ছিল!", "শপ!", "পিছলা!", "আছাড়!"];
 const tomatoSounds = ["প্যাচাত!", "চপচপ!", "টমেটো!", "রসেভরপুর!"];
+
+// Character-specific hit voice lines
+const nasirHitLines = ["চাঁদা বাজ!", "চাঁদা আব্বাস!", "আল্লামা আব্বাস!", "সন্ত্রাসী আব্বাস!", "বোরকা আব্বাস!", "নিরাপত্তা ঝুকিতে আছি!"];
+const abbasHitLines = ["পঙ্গটা!", "বেয়াদব!", "বাচ্চা!", "জালেম!", "তুমি আমার ছেলের বয়সী!", "কত বড় বেয়াদব!", "ঘুম থেকে উঠে আমার নাম নেশ!"];
 
 const funnyReactions = ["ওরে বাবা!", "মারবি নাকি?", "ধুর মিয়া!", "আরে আরে!", "মালাইকারি!", "বাপ রে!", "হায় হায়!", "ইজ্জত গেল!", "কি করছিস!"];
 const angryReactions = ["ছাড়ব না তোরে!", "অ্যাই কি করোস!", "মারামারি করবি?", "খাইছি তোরে!", "বেয়াদব!", "থাম ব্যাটা!", "অসভ্য!", "চোপ!", "খবর আছে!"];
@@ -1234,6 +1292,15 @@ function playProceduralHit(type) {
         gain.gain.setValueAtTime(0.4, now);
         gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
         osc.start(now); osc.stop(now + 0.3);
+    } else if (type === 'banana') {
+        // --- BANANA SLIP + SPLAT ---
+        playNoise(1200, 0.08, 0.6);
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(300, now);
+        osc.frequency.exponentialRampToValueAtTime(80, now + 0.15);
+        gain.gain.setValueAtTime(0.7, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+        osc.start(now); osc.stop(now + 0.2);
     } else {
         // --- GENERIC THUD ---
         osc.type = 'sine';
@@ -1262,20 +1329,65 @@ function playProceduralThrow() {
     osc.start(now); osc.stop(now + 0.08);
 }
 
-function playSoundEffect(type, itemType = 'egg') {
+// Whoosh sound for throws (more satisfying)
+function playThrowWhoosh() {
+    if (!audioCtx) initAudio();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const now = audioCtx.currentTime;
+
+    // Noise-based whoosh
+    const dur = 0.15;
+    const bufSize = audioCtx.sampleRate * dur;
+    const buf = audioCtx.createBuffer(1, bufSize, audioCtx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < bufSize; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / bufSize);
+    const src = audioCtx.createBufferSource();
+    src.buffer = buf;
+    const bpf = audioCtx.createBiquadFilter();
+    bpf.type = 'bandpass'; bpf.frequency.value = 600; bpf.Q.value = 1.5;
+    const g = audioCtx.createGain();
+    g.gain.setValueAtTime(0.6, now);
+    g.gain.exponentialRampToValueAtTime(0.01, now + dur);
+    src.connect(bpf); bpf.connect(g); g.connect(audioCtx.destination);
+    src.start(now); src.stop(now + dur);
+}
+
+function playSoundEffect(type, itemType = 'egg', hitTarget = null) {
     if (type === 'hit') {
         // 1. Procedural High-Impact Sound
         playProceduralHit(itemType);
 
-        // 2. Angry/Pain Shouting
-        const isAngry = Math.random() < 0.7; // 70% chance of angry reaction
-        const reactionList = isAngry ? angryReactions : funnyReactions;
-        const txt = reactionList[Math.floor(Math.random() * reactionList.length)];
+        // 2. Character-specific voice line from the ATTACKER taunting the target
+        let txt;
+        // Determine attacker type (opposite of target)
+        let attackerType = null;
+        if (hitTarget) {
+            attackerType = hitTarget.type === 'nasir' ? 'abbas' : 'nasir';
+        }
 
-        // Shout it!
-        speak(txt, isAngry ? 1.6 : 1.3, isAngry ? 1.4 : 1.1);
+        if (attackerType === 'nasir') {
+            // Nasir is attacking Abbas — Nasir taunts
+            txt = nasirHitLines[Math.floor(Math.random() * nasirHitLines.length)];
+        } else if (attackerType === 'abbas') {
+            // Abbas is attacking Nasir — Abbas taunts
+            txt = abbasHitLines[Math.floor(Math.random() * abbasHitLines.length)];
+        } else {
+            const isAngry = Math.random() < 0.7;
+            const reactionList = isAngry ? angryReactions : funnyReactions;
+            txt = reactionList[Math.floor(Math.random() * reactionList.length)];
+        }
+
+        // Show dialogue text above the attacker
+        if (hitTarget && txt) {
+            const attacker = hitTarget === player ? opponent : player;
+            showDialogueBubble(txt, attacker.x + attacker.width / 2, attacker.y - 30);
+        }
+
+        // Speak it!
+        speak(txt, 1.3 + Math.random() * 0.4, 1.1 + Math.random() * 0.3);
     } else if (type === 'throw') {
-        // Procedural Pop
+        // Whoosh + Procedural Pop
+        playThrowWhoosh();
         playProceduralThrow();
 
         const txt = throwSounds[Math.floor(Math.random() * throwSounds.length)];
@@ -1304,17 +1416,59 @@ function playSoundEffect(type, itemType = 'egg') {
     }
 }
 
+let lastSpeakTime = 0;
 function speak(text, pitch = 1, rate = 1) {
     if (!window.speechSynthesis) return;
-    window.speechSynthesis.cancel();
+    // Throttle: min 800ms between calls so dialogues don't overlap
+    const now = Date.now();
+    if (now - lastSpeakTime < 800) return;
+    lastSpeakTime = now;
 
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'bn-BD'; // Bengali
-    utterance.pitch = pitch + (Math.random() * 0.2 - 0.1);
-    utterance.rate = rate + (Math.random() * 0.2 - 0.1);
-    utterance.volume = 1.0;
+    try {
+        // Cancel any ongoing speech so new one plays immediately
+        window.speechSynthesis.cancel();
 
-    window.speechSynthesis.speak(utterance);
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'bn-BD';
+        utterance.pitch = Math.max(0.1, pitch + (Math.random() * 0.2 - 0.1));
+        utterance.rate = Math.max(0.1, rate + (Math.random() * 0.2 - 0.1));
+        utterance.volume = 1.0;
+        utterance.onerror = () => {};
+
+        window.speechSynthesis.speak(utterance);
+    } catch (e) {
+        // Speech synthesis not available — continue game
+    }
+}
+
+// Dialogue bubble that appears above fighter's head
+function showDialogueBubble(text, x, y) {
+    const div = document.createElement('div');
+    div.innerText = text;
+    div.style.cssText = `
+        position: absolute;
+        left: ${x}px;
+        top: ${y}px;
+        transform: translateX(-50%);
+        background: rgba(0, 0, 0, 0.85);
+        color: #fff;
+        padding: 6px 14px;
+        border-radius: 12px;
+        font-size: clamp(0.9rem, 2vw, 1.3rem);
+        font-family: 'Hind Siliguri', sans-serif;
+        font-weight: 700;
+        white-space: nowrap;
+        pointer-events: none;
+        z-index: 3000;
+        border: 2px solid rgba(255, 204, 0, 0.7);
+        text-shadow: 0 0 8px rgba(255, 204, 0, 0.5);
+        animation: dialoguePop 1.5s ease-out forwards;
+    `;
+    document.body.appendChild(div);
+
+    setTimeout(() => {
+        if (div.parentNode) div.remove();
+    }, 1500);
 }
 
 function triggerRoast() {
@@ -1356,10 +1510,13 @@ function endGame(playerWon) {
 
     if (statsSummary) {
         statsSummary.innerHTML = `
-            <div style="display:flex; justify-content:space-around; gap:10px; flex-wrap:wrap; font-size: clamp(0.7rem, 1.5vh, 1rem);">
-                <div>⏱️ <strong>${mins}:${secs.toString().padStart(2, '0')}</strong></div>
-                <div>💚 <strong style="color:${pHealthLeft > 30 ? '#0f0' : '#f44'}">${pHealthLeft}%</strong></div>
-                <div>💔 <strong style="color:${oHealthLeft > 30 ? '#0f0' : '#f44'}">${oHealthLeft}%</strong></div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; font-size: clamp(0.65rem, 1.3vh, 0.9rem); text-align:left;">
+                <div>⏱️ সময়: <strong>${mins}:${secs.toString().padStart(2, '0')}</strong></div>
+                <div>🎯 স্কোর: <strong style="color:#ffcc00">${player.score}</strong></div>
+                <div>💚 আপনার HP: <strong style="color:${pHealthLeft > 30 ? '#0f0' : '#f44'}">${pHealthLeft}%</strong></div>
+                <div>💔 প্রতিপক্ষ HP: <strong style="color:${oHealthLeft > 30 ? '#0f0' : '#f44'}">${oHealthLeft}%</strong></div>
+                <div>🥊 হিট: <strong>${player.totalHits}</strong></div>
+                <div>🔥 সর্বোচ্চ কম্বো: <strong style="color:#ffa500">${player.maxCombo}x</strong></div>
             </div>
         `;
     }
@@ -1368,9 +1525,28 @@ function endGame(playerWon) {
         bgMusic.pause();
         bgMusic.currentTime = 0;
     }
+
+    // Clean up floating texts
+    activeFloatingTexts.forEach(e => {
+        if (e.timer) clearInterval(e.timer);
+        if (e.div.parentNode) e.div.remove();
+    });
+    activeFloatingTexts = [];
+
+    // Cancel any pending speech
+    if (window.speechSynthesis) {
+        try { window.speechSynthesis.cancel(); } catch(e) {}
+    }
 }
 
 function showFloatingText(text, x, y, isCrit = false) {
+    // Limit max floating texts to avoid DOM overload
+    if (activeFloatingTexts.length > 15) {
+        const old = activeFloatingTexts.shift();
+        if (old.timer) clearInterval(old.timer);
+        if (old.div.parentNode) old.div.remove();
+    }
+
     const div = document.createElement('div');
     div.innerText = text;
     div.style.position = 'absolute';
@@ -1387,16 +1563,20 @@ function showFloatingText(text, x, y, isCrit = false) {
 
     let op = 1;
     let topPos = y;
-    let timer = setInterval(() => {
+    const entry = { div, timer: null };
+    entry.timer = setInterval(() => {
         if (op <= 0.1) {
-            clearInterval(timer);
-            div.remove();
+            clearInterval(entry.timer);
+            if (div.parentNode) div.remove();
+            activeFloatingTexts = activeFloatingTexts.filter(e => e !== entry);
+            return;
         }
         div.style.opacity = op;
         div.style.top = topPos + 'px';
         op -= 0.1;
         topPos -= 2;
     }, 50);
+    activeFloatingTexts.push(entry);
 }
 
 // Controls (Point & Click)
@@ -1553,7 +1733,6 @@ window.addEventListener('keydown', (e) => {
     if (e.key === ' ' && player && player.onGround && gameActive) {
         player.vy = -12 * GAME_SCALE;
     }
-    if (e.code === 'Space') triggerRoast();
 });
 
 window.addEventListener('keyup', (e) => {
@@ -1563,6 +1742,112 @@ window.addEventListener('keyup', (e) => {
 
 startBtn.addEventListener('click', startGame);
 restartBtn.addEventListener('click', startGame);
+
+// --- PAUSE / PLAY / BACK / MUSIC CONTROLS ---
+let gamePaused = false;
+let pauseOverlay = null;
+let musicMuted = false;
+
+const btnPause = document.getElementById('btn-pause');
+const btnBack = document.getElementById('btn-back');
+const btnMusic = document.getElementById('btn-music');
+
+function pauseGame() {
+    if (!gameActive || gamePaused) return;
+    gamePaused = true;
+    if (bgMusic) bgMusic.pause();
+    if (btnPause) btnPause.textContent = '▶️';
+
+    // Show pause overlay
+    pauseOverlay = document.createElement('div');
+    pauseOverlay.className = 'pause-overlay';
+    pauseOverlay.innerHTML = `
+        <h2>⏸️ বিরতি</h2>
+        <button class="pause-resume-btn">চালিয়ে যান ▶️</button>
+    `;
+    document.body.appendChild(pauseOverlay);
+    pauseOverlay.querySelector('.pause-resume-btn').addEventListener('click', resumeGame);
+}
+
+function resumeGame() {
+    if (!gamePaused) return;
+    gamePaused = false;
+    if (bgMusic && !musicMuted) bgMusic.play().catch(() => {});
+    if (btnPause) btnPause.textContent = '⏸️';
+
+    if (pauseOverlay && pauseOverlay.parentNode) {
+        pauseOverlay.remove();
+        pauseOverlay = null;
+    }
+    requestAnimationFrame(gameLoop);
+}
+
+function goBack() {
+    // Stop the game and return to landing screen
+    gameActive = false;
+    gamePaused = false;
+    if (bgMusic) {
+        bgMusic.pause();
+        bgMusic.currentTime = 0;
+    }
+    if (pauseOverlay && pauseOverlay.parentNode) {
+        pauseOverlay.remove();
+        pauseOverlay = null;
+    }
+    if (animationFrameId) cancelAnimationFrame(animationFrameId);
+
+    // Clean up floating texts
+    activeFloatingTexts.forEach(e => {
+        if (e.timer) clearInterval(e.timer);
+        if (e.div.parentNode) e.div.remove();
+    });
+    activeFloatingTexts = [];
+    if (window.speechSynthesis) {
+        try { window.speechSynthesis.cancel(); } catch(e) {}
+    }
+
+    gameScreen.classList.remove('visible');
+    gameOverScreen.classList.remove('visible');
+    landingScreen.classList.add('visible');
+    if (btnPause) btnPause.textContent = '⏸️';
+}
+
+function toggleMusic() {
+    musicMuted = !musicMuted;
+    if (bgMusic) {
+        if (musicMuted) {
+            bgMusic.pause();
+            if (btnMusic) btnMusic.textContent = '🔇';
+        } else {
+            if (gameActive && !gamePaused) bgMusic.play().catch(() => {});
+            if (btnMusic) btnMusic.textContent = '🔊';
+        }
+    }
+}
+
+if (btnPause) btnPause.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (gamePaused) resumeGame();
+    else pauseGame();
+});
+
+if (btnBack) btnBack.addEventListener('click', (e) => {
+    e.stopPropagation();
+    goBack();
+});
+
+if (btnMusic) btnMusic.addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleMusic();
+});
+
+// Escape key to pause/resume
+window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && gameActive) {
+        if (gamePaused) resumeGame();
+        else pauseGame();
+    }
+});
 
 // Initialize Stats
 StatsManager.init();
