@@ -409,88 +409,96 @@ class Fighter {
             this.aiStateTimer = (this.aiStateTimer || 0) + 1;
             if (!this.aiState) this.aiState = 'pace';
 
+            // --- ENRAGE FACTOR: 0.0 (full HP) to 1.0 (near death) ---
+            let enrage = 1 - (this.health / this.maxHealth);
+
             // Direction toward and away from player
             const toPlayerDir = player.x > this.x ? -1 : 1; // away direction
             const towardPlayer = -toPlayerDir; // toward direction
             let distToPlayer = Math.abs(this.x - player.x);
 
-            // 1. SMART MOVEMENT (State Machine)
+            // 1. SMART MOVEMENT (State Machine) — gets faster & more active with enrage
+            let moveSpeed = (1 + enrage * 0.6) * GAME_SPEED; // 1.0x to 1.6x
             if (this.onGround) {
-                // Switch AI state periodically
-                if (this.aiStateTimer > 60 + Math.random() * 80) {
+                // Switch state faster when enraged
+                let stateChangeInterval = 60 + Math.random() * 80 - enrage * 40;
+                if (this.aiStateTimer > stateChangeInterval) {
                     this.aiStateTimer = 0;
                     const rand = Math.random();
-                    if (distToPlayer < 250) this.aiState = 'retreat';
+                    // More aggressive state selection when enraged
+                    let retreatThreshold = 250 - enrage * 100; // Gets braver
+                    if (distToPlayer < retreatThreshold) this.aiState = 'retreat';
                     else if (distToPlayer > 700) this.aiState = 'approach';
-                    else if (rand < 0.4) this.aiState = 'pace';
-                    else if (rand < 0.7) this.aiState = 'strafe';
+                    else if (rand < 0.3 - enrage * 0.1) this.aiState = 'pace';
+                    else if (rand < 0.6) this.aiState = 'strafe';
+                    else if (rand < 0.8) this.aiState = 'approach';
                     else this.aiState = 'hold';
                 }
 
                 if (this.aiState === 'retreat') {
-                    this.vx = toPlayerDir * 3.5 * GAME_SPEED;
+                    this.vx = toPlayerDir * 3.5 * moveSpeed;
                     if (distToPlayer > 450) this.aiState = 'pace';
                 } else if (this.aiState === 'approach') {
-                    this.vx = towardPlayer * 2.5 * GAME_SPEED;
-                    if (distToPlayer < 500) this.aiState = 'pace';
+                    this.vx = towardPlayer * (2.5 + enrage * 1.5) * moveSpeed;
+                    if (distToPlayer < 400) this.aiState = 'strafe';
                 } else if (this.aiState === 'pace') {
-                    // Gentle side-to-side pacing
-                    if (Math.random() < 0.03) this.vx = (Math.random() - 0.5) * 4;
+                    if (Math.random() < 0.03 + enrage * 0.02) this.vx = (Math.random() - 0.5) * (4 + enrage * 3);
                 } else if (this.aiState === 'strafe') {
-                    // Quick lateral movement
-                    if (Math.random() < 0.05) this.vx = (Math.random() > 0.5 ? 1 : -1) * (3 + Math.random() * 2);
+                    if (Math.random() < 0.05 + enrage * 0.03) this.vx = (Math.random() > 0.5 ? 1 : -1) * (3 + Math.random() * 2 + enrage * 2);
                 } else {
-                    // 'hold' — stand still, focus on aiming
                     this.vx *= 0.8;
                 }
             }
 
-            // 2. SMART DODGE (Mostly sidestep, rare jump)
-            // AI gets better at dodging as health drops (enrage)
-            let dodgeSkill = 0.5 + ((this.maxHealth - this.health) / this.maxHealth) * 0.4; // 0.5 to 0.9
-            if (this.reactionTimer > 6 && this.dodgeCooldown <= 0) {
+            // 2. SMART DODGE — scales with enrage
+            let reactionSpeed = Math.max(3, 6 - Math.floor(enrage * 3)); // 6 frames down to 3
+            let dodgeRecovery = Math.max(10, 20 - Math.floor(enrage * 10)); // Faster dodge recovery
+            let threatRange = 350 + enrage * 150; // Detects threats from further
+
+            if (this.reactionTimer > reactionSpeed && this.dodgeCooldown <= 0) {
                 const threat = projectiles.find(p => {
                     if (!p.isPlayer || !p.active) return false;
                     let dist = Math.abs(p.x - this.x);
-                    if (dist > 350) return false;
+                    if (dist > threatRange) return false;
                     return (p.vx > 0 && p.x < this.x) || (p.vx < 0 && p.x > this.x);
                 });
                 if (threat) {
                     this.totalDodges++;
+                    // Dodge success rate: 75% at full HP → 96% near death
+                    let dodgeChance = 0.75 + enrage * 0.21;
                     const dodgeRoll = Math.random();
-                    if (dodgeRoll < 0.50 * dodgeSkill + 0.25) {
-                        // SIDESTEP (most common)
-                        this.vx = toPlayerDir * (7 + Math.random() * 4) * GAME_SPEED;
-                        this.dodgeCooldown = 20;
-                        if (Math.random() < 0.4) showFloatingText("ধুর!", this.x, this.y - 40);
-                    } else if (dodgeRoll < 0.75) {
-                        // DUCK/CROUCH dodge
-                        this.vx = towardPlayer * 5 * GAME_SPEED;
-                        this.dodgeCooldown = 25;
-                    } else if (dodgeRoll < 0.93 && this.onGround && this.jumpCooldown <= 0) {
+                    if (dodgeRoll < dodgeChance * 0.65) {
+                        // SIDESTEP
+                        this.vx = toPlayerDir * (7 + Math.random() * 4 + enrage * 3) * GAME_SPEED;
+                        this.dodgeCooldown = dodgeRecovery;
+                        if (Math.random() < 0.35) showFloatingText("ধুর!", this.x, this.y - 40);
+                    } else if (dodgeRoll < dodgeChance * 0.85) {
+                        // DUCK/CROUCH
+                        this.vx = towardPlayer * (5 + enrage * 2) * GAME_SPEED;
+                        this.dodgeCooldown = dodgeRecovery + 3;
+                    } else if (dodgeRoll < dodgeChance && this.onGround && this.jumpCooldown <= 0) {
                         // JUMP
                         this.vy = -12 * GAME_SCALE;
-                        this.vx = toPlayerDir * 3;
-                        this.jumpCooldown = 80;
-                        this.dodgeCooldown = 35;
+                        this.vx = toPlayerDir * (3 + enrage * 2);
+                        this.jumpCooldown = Math.max(50, 80 - enrage * 30);
+                        this.dodgeCooldown = dodgeRecovery + 10;
                         showFloatingText("ধুর!", this.x, this.y - 40);
                     } else {
-                        // No dodge (fail ~7%)
-                        this.dodgeCooldown = 12;
+                        // Failed dodge
+                        this.dodgeCooldown = 10;
                     }
                 }
                 this.reactionTimer = 0;
             }
 
-            // 3. OFFENSE (Throw / Gun Mode) — AI gets more aggressive as health drops
+            // 3. OFFENSE — attack rate scales with enrage
             let isGunMode = this.health < (this.maxHealth * 0.4);
-            let healthRatio = this.health / this.maxHealth;
-            let baseRate = isGunMode ? 28 : (65 - (1 - healthRatio) * 30);
-            let aggressionRate = Math.max(baseRate / GAME_SPEED, 22);
+            let baseRate = isGunMode ? (28 - enrage * 10) : (60 - enrage * 30);
+            let aggressionRate = Math.max(baseRate / GAME_SPEED, 15 + (1 - enrage) * 10);
 
             if (this.cooldown > aggressionRate) {
                 this.throwProjectile();
-                this.cooldown = -Math.random() * (isGunMode ? 8 : 18);
+                this.cooldown = -Math.random() * (isGunMode ? (8 - enrage * 4) : (16 - enrage * 8));
             }
         }
     }
@@ -852,8 +860,10 @@ class Fighter {
 
             if (isGunMode) {
                 // --- GUN AIMING (Hitscan-like) ---
-                // Predict where they will be in ~3 frames (very fast bullet)
-                let predictedX = target.x + target.width / 2 + (target.vx * 3);
+                // Predict where they will be in ~3-5 frames (scales with enrage)
+                let gunAccuracy = (this.maxHealth - this.health) / this.maxHealth;
+                let predFrames = Math.max(1, 3 - gunAccuracy * 2);
+                let predictedX = target.x + target.width / 2 + (target.vx * predFrames);
                 let predictedY = target.y + target.height * 0.4;
 
                 let dx = predictedX - startX;
@@ -872,14 +882,13 @@ class Fighter {
                 let dy = (target.y + 60) - startY; // Aim for chest
 
                 // 2. BALLISTICS SOLVER
-                // Shorter flight = faster projectile = harder to dodge
-                // Range-adaptive: close = 20 frames, far = 45 frames
+                // Flight time decreases as AI gets hurt = faster, harder projectiles
                 let dist = Math.abs(dx);
-                let baseTime = 20 + (dist / canvas.width) * 25;
-                let timeToHit = baseTime + Math.random() * 10;
+                let baseTime = (18 - accuracy * 5) + (dist / canvas.width) * (22 - accuracy * 8);
+                let timeToHit = baseTime + Math.random() * (8 - accuracy * 5);
 
-                // Lead prediction: predict where target will be at impact time
-                let leadFactor = timeToHit * (0.6 + accuracy * 0.3);
+                // Lead prediction: better lead at lower health
+                let leadFactor = timeToHit * (0.6 + accuracy * 0.35);
                 let predictedX = target.x + (target.vx * leadFactor);
                 let predictedY = target.y + 60;
 
@@ -894,10 +903,10 @@ class Fighter {
                 vx = dx / timeToHit;
                 vy = (dy - (0.5 * effectiveGravity * timeToHit * timeToHit)) / timeToHit;
 
-                // 3. HUMANIZATION (slight error, decreases as AI gets hurt)
-                let errorMag = Math.max(0.15, (this.health / this.maxHealth) * 0.9);
+                // 3. HUMANIZATION (error shrinks dramatically as AI gets hurt)
+                let errorMag = Math.max(0.05, (this.health / this.maxHealth) * 0.8);
                 vx += (Math.random() - 0.5) * errorMag;
-                vy += (Math.random() - 0.5) * errorMag * 0.4;
+                vy += (Math.random() - 0.5) * errorMag * 0.3;
             }
         }
 
