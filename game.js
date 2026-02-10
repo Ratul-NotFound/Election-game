@@ -172,6 +172,7 @@ function spawnParticles(x, y, type, count = 5) {
     }
 }
 let gravity = 0.5;
+let GAME_SPEED = 0.8; // 1.0 = normal, 0.8 = 20% slower
 let selectedCandidate = 'abbas';
 let currentAmmo = 'egg';
 let animationFrameId = null;
@@ -384,9 +385,9 @@ class Fighter {
 
         // Player Movement Logic
         if (this.isPlayer && gameActive) {
-            let speed = 5 * GAME_SCALE;
+            let speed = 5 * GAME_SCALE * GAME_SPEED;
             if (keys['Shift']) {
-                speed = 12 * GAME_SCALE; // SPRINT!
+                speed = 12 * GAME_SCALE * GAME_SPEED; // SPRINT!
                 // Sprint Dust
                 if (this.onGround && Math.abs(this.vx) > 0 && Math.random() < 0.3) {
                     spawnParticles(this.x + this.width / 2, this.y + this.height * 0.95, 'dust', 1);
@@ -427,10 +428,10 @@ class Fighter {
                 }
 
                 if (this.aiState === 'retreat') {
-                    this.vx = toPlayerDir * 3.5; // Back off
+                    this.vx = toPlayerDir * 3.5 * GAME_SPEED;
                     if (distToPlayer > 450) this.aiState = 'pace';
                 } else if (this.aiState === 'approach') {
-                    this.vx = towardPlayer * 2.5;
+                    this.vx = towardPlayer * 2.5 * GAME_SPEED;
                     if (distToPlayer < 500) this.aiState = 'pace';
                 } else if (this.aiState === 'pace') {
                     // Gentle side-to-side pacing
@@ -457,12 +458,12 @@ class Fighter {
                     const dodgeRoll = Math.random();
                     if (dodgeRoll < 0.55) {
                         // SIDESTEP (most common) — move laterally
-                        this.vx = toPlayerDir * (6 + Math.random() * 3);
+                        this.vx = toPlayerDir * (6 + Math.random() * 3) * GAME_SPEED;
                         this.dodgeCooldown = 25;
                         if (Math.random() < 0.4) showFloatingText("ধুর!", this.x, this.y - 40);
                     } else if (dodgeRoll < 0.75) {
                         // DUCK/CROUCH dodge — just change nothing visually but avoid
-                        this.vx = towardPlayer * 4; // Rush under the projectile
+                        this.vx = towardPlayer * 4 * GAME_SPEED; // Rush under the projectile
                         this.dodgeCooldown = 30;
                     } else if (dodgeRoll < 0.90 && this.onGround && this.jumpCooldown <= 0) {
                         // JUMP (rare, only if on ground and cooldown is done)
@@ -482,7 +483,7 @@ class Fighter {
             // 3. OFFENSE (Throw / Gun Mode)
             let isGunMode = this.health < (this.maxHealth * 0.4);
             let aggressionRate = isGunMode ? 35 : (80 - ((this.maxHealth - this.health) / this.maxHealth) * 30);
-            aggressionRate = Math.max(aggressionRate, 25); // Minimum cooldown
+            aggressionRate = Math.max(aggressionRate / GAME_SPEED, 30); // Slower attacks
 
             if (this.cooldown > aggressionRate) {
                 this.throwProjectile();
@@ -955,12 +956,12 @@ class Projectile {
     }
 
     update() {
-        this.x += this.vx;
-        this.y += this.vy;
+        this.x += this.vx * GAME_SPEED;
+        this.y += this.vy * GAME_SPEED;
 
         // Bullet pays no respect to gravity
         if (this.type !== 'bullet') {
-            this.vy += gravity * GAME_SCALE;
+            this.vy += gravity * GAME_SCALE * GAME_SPEED;
         }
 
         if (this.y > canvas.height - 100 || this.x < -100 || this.x > canvas.width + 100) {
