@@ -304,8 +304,8 @@ class Fighter {
         this.x = isPlayer ? canvas.width * 0.15 : canvas.width * 0.85 - this.width;
         this.y = GROUND_Y - this.height;
 
-        this.maxHealth = 1000;
-        this.health = 1000;
+        this.maxHealth = 2000;
+        this.health = 2000;
         this.img = type === 'abbas' ? abbasImg : nasirImg;
         this.vy = 0;
         this.onGround = true;
@@ -446,48 +446,51 @@ class Fighter {
             }
 
             // 2. SMART DODGE (Mostly sidestep, rare jump)
-            if (this.reactionTimer > 8 && this.dodgeCooldown <= 0) {
+            // AI gets better at dodging as health drops (enrage)
+            let dodgeSkill = 0.5 + ((this.maxHealth - this.health) / this.maxHealth) * 0.4; // 0.5 to 0.9
+            if (this.reactionTimer > 6 && this.dodgeCooldown <= 0) {
                 const threat = projectiles.find(p => {
                     if (!p.isPlayer || !p.active) return false;
                     let dist = Math.abs(p.x - this.x);
-                    if (dist > 300) return false;
+                    if (dist > 350) return false;
                     return (p.vx > 0 && p.x < this.x) || (p.vx < 0 && p.x > this.x);
                 });
                 if (threat) {
                     this.totalDodges++;
                     const dodgeRoll = Math.random();
-                    if (dodgeRoll < 0.55) {
-                        // SIDESTEP (most common) — move laterally
-                        this.vx = toPlayerDir * (6 + Math.random() * 3) * GAME_SPEED;
-                        this.dodgeCooldown = 25;
+                    if (dodgeRoll < 0.50 * dodgeSkill + 0.25) {
+                        // SIDESTEP (most common)
+                        this.vx = toPlayerDir * (7 + Math.random() * 4) * GAME_SPEED;
+                        this.dodgeCooldown = 20;
                         if (Math.random() < 0.4) showFloatingText("ধুর!", this.x, this.y - 40);
                     } else if (dodgeRoll < 0.75) {
-                        // DUCK/CROUCH dodge — just change nothing visually but avoid
-                        this.vx = towardPlayer * 4 * GAME_SPEED; // Rush under the projectile
-                        this.dodgeCooldown = 30;
-                    } else if (dodgeRoll < 0.90 && this.onGround && this.jumpCooldown <= 0) {
-                        // JUMP (rare, only if on ground and cooldown is done)
+                        // DUCK/CROUCH dodge
+                        this.vx = towardPlayer * 5 * GAME_SPEED;
+                        this.dodgeCooldown = 25;
+                    } else if (dodgeRoll < 0.93 && this.onGround && this.jumpCooldown <= 0) {
+                        // JUMP
                         this.vy = -12 * GAME_SCALE;
                         this.vx = toPlayerDir * 3;
-                        this.jumpCooldown = 90; // Can't jump again for 90 frames (~1.5s)
-                        this.dodgeCooldown = 40;
+                        this.jumpCooldown = 80;
+                        this.dodgeCooldown = 35;
                         showFloatingText("ধুর!", this.x, this.y - 40);
                     } else {
-                        // No dodge (miss/fail ~10%)
-                        this.dodgeCooldown = 15;
+                        // No dodge (fail ~7%)
+                        this.dodgeCooldown = 12;
                     }
                 }
                 this.reactionTimer = 0;
             }
 
-            // 3. OFFENSE (Throw / Gun Mode)
+            // 3. OFFENSE (Throw / Gun Mode) — AI gets more aggressive as health drops
             let isGunMode = this.health < (this.maxHealth * 0.4);
-            let aggressionRate = isGunMode ? 35 : (80 - ((this.maxHealth - this.health) / this.maxHealth) * 30);
-            aggressionRate = Math.max(aggressionRate / GAME_SPEED, 30); // Slower attacks
+            let healthRatio = this.health / this.maxHealth;
+            let baseRate = isGunMode ? 28 : (65 - (1 - healthRatio) * 30);
+            let aggressionRate = Math.max(baseRate / GAME_SPEED, 22);
 
             if (this.cooldown > aggressionRate) {
                 this.throwProjectile();
-                this.cooldown = -Math.random() * (isGunMode ? 10 : 25);
+                this.cooldown = -Math.random() * (isGunMode ? 8 : 18);
             }
         }
     }
@@ -892,9 +895,9 @@ class Fighter {
                 vy = (dy - (0.5 * effectiveGravity * timeToHit * timeToHit)) / timeToHit;
 
                 // 3. HUMANIZATION (slight error, decreases as AI gets hurt)
-                let errorMag = Math.max(0.2, (this.health / this.maxHealth) * 1.2);
+                let errorMag = Math.max(0.15, (this.health / this.maxHealth) * 0.9);
                 vx += (Math.random() - 0.5) * errorMag;
-                vy += (Math.random() - 0.5) * errorMag * 0.5;
+                vy += (Math.random() - 0.5) * errorMag * 0.4;
             }
         }
 
@@ -1007,15 +1010,15 @@ function checkHit(proj, target) {
             seed: Math.random() * 10
         });
 
-        // Critical Hit Calculation (20% chance)
-        let isCrit = Math.random() < 0.2;
-        let damage = 10;
+        // Critical Hit Calculation (15% chance)
+        let isCrit = Math.random() < 0.15;
+        let damage = 8;
 
-        if (proj.type === 'bullet') damage = 10; // Gun: 3 hits from 30% HP
-        else if (proj.type === 'chappal') damage = 8;
-        else if (proj.type === 'mic') damage = 3;
-        else if (proj.type === 'banana') damage = 6;
-        else if (proj.type === 'tomato') damage = 4;
+        if (proj.type === 'bullet') damage = 8;
+        else if (proj.type === 'chappal') damage = 6;
+        else if (proj.type === 'mic') damage = 2;
+        else if (proj.type === 'banana') damage = 5;
+        else if (proj.type === 'tomato') damage = 3;
 
         // Physics Reaction (Knockback)
         let knockbackDir = proj.vx > 0 ? 1 : -1;
